@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { getClientConfig, validateClientConfig, ClientConfig } from '@/lib/config';
 import { createGoogleContact } from '@/lib/google-contacts';
 
 interface RouteParams {
   params: Promise<{ clientId: string }>;
+}
+
+interface KommoCustomField {
+  field_id: number;
+  field_code?: string;
+  field_name?: string;
+  values: { value: string }[];
 }
 
 /**
@@ -203,7 +210,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const rawBody = await request.text();
 
     // Parse payload
-    let payload: any;
+    let payload: Record<string, string>;
     if (contentType?.includes('application/x-www-form-urlencoded')) {
       const params = new URLSearchParams(rawBody);
       payload = {};
@@ -267,14 +274,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
               if (!email) {
                 const emailField = contactData.custom_fields_values?.find(
-                  (f: any) => f.field_code === 'EMAIL' || f.field_name === 'Email'
+                  (f: KommoCustomField) => f.field_code === 'EMAIL' || f.field_name === 'Email'
                 );
                 email = emailField?.values?.[0]?.value || null;
               }
 
               if (!phone) {
                 const phoneField = contactData.custom_fields_values?.find(
-                  (f: any) => f.field_code === 'PHONE' || f.field_name === 'Phone'
+                  (f: KommoCustomField) => f.field_code === 'PHONE' || f.field_name === 'Phone'
                 );
                 phone = phoneField?.values?.[0]?.value || null;
               }
@@ -305,7 +312,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       language: 'es',
     };
 
-    let axiosConfig: any = {
+    const axiosConfig: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json-patch+json',
         'Authorization': `Bearer ${config.backend.api_token}`,
