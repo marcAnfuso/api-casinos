@@ -1,0 +1,32 @@
+{
+  "clients": {
+    "bet30": {
+      "name": "bet30",
+      "kommo": {
+        "access_token": "env:BET30_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lorenzogu32",
+        "whatsapp_scope_id": "env:BET30_KOMMO_WHATSAPP_SCOPE_ID",
+        "username_field_id": 1492038,
+        "password_field_id": 1492040,
+        "comprobante_status_id": 96367691
+      },
+      "backend": {
+        "type": "bet30",
+        "api_url": "https://admin.bet30.store/api/services/app/Players/AddPlayer",
+        "api_token": "env:BET30_PLAYER_API_TOKEN",
+        "skin_id": "1025c6bf14cd"
+      },
+      "google": {
+        "client_id": "env:BET30_GOOGLE_CLIENT_ID",
+        "client_secret": "env:BET30_GOOGLE_CLIENT_SECRET",
+        "refresh_token": "env:BET30_GOOGLE_REFRESH_TOKEN"
+      },
+      "proxy": {
+        "host": "env:DECODO_PROXY_HOST",
+        "port": "env:DECODO_PROXY_PORT",
+        "username": "env:DECODO_PROXY_USERNAME",
+        "password": "env:DECODO_PROXY_PASSWORD"
+      }
+    }
+  }
+}

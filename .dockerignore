@@ -1,0 +1,49 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Next.js
+.next
+out
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# PM2
+ecosystem.config.js
+
+# Documentation
+README.md
+DEPLOY_DIGITALOCEAN.md
+scripts/README.md
+
+# Testing
+coverage
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
