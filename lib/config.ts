@@ -11,6 +11,7 @@ export interface KommoConfig {
   whatsapp_scope_id?: string;
   username_field_id: number;
   password_field_id: number;
+  esperando_comprobante_status_id?: number;
   comprobante_recibido_status_id?: number;
   comprobante_no_recibido_status_id?: number;
   no_respondio_status_id?: number;
@@ -54,6 +55,7 @@ interface RawClientConfig {
     whatsapp_scope_id?: string;
     username_field_id: number;
     password_field_id: number;
+    esperando_comprobante_status_id?: number;
     comprobante_recibido_status_id?: number;
     comprobante_no_recibido_status_id?: number;
     no_respondio_status_id?: number;
@@ -122,6 +124,7 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       whatsapp_scope_id: resolveEnvVar(rawConfig.kommo.whatsapp_scope_id) || undefined,
       username_field_id: rawConfig.kommo.username_field_id,
       password_field_id: rawConfig.kommo.password_field_id,
+      esperando_comprobante_status_id: rawConfig.kommo.esperando_comprobante_status_id,
       comprobante_recibido_status_id: rawConfig.kommo.comprobante_recibido_status_id,
       comprobante_no_recibido_status_id: rawConfig.kommo.comprobante_no_recibido_status_id,
       no_respondio_status_id: rawConfig.kommo.no_respondio_status_id,

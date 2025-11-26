@@ -8,6 +8,7 @@
         "whatsapp_scope_id": "env:BET30_KOMMO_WHATSAPP_SCOPE_ID",
         "username_field_id": 1492038,
         "password_field_id": 1492040,
+        "esperando_comprobante_status_id": 97065031,
         "comprobante_recibido_status_id": 97022603,
         "comprobante_no_recibido_status_id": 97022971,
         "no_respondio_status_id": 90036483,
