@@ -313,38 +313,65 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       language: 'es',
     };
 
-    const axiosConfig: AxiosRequestConfig = {
-      headers: {
-        'Content-Type': 'application/json-patch+json',
-        'Authorization': `Bearer ${config.backend.api_token}`,
-        'User-Agent': 'Mozilla/5.0',
-      },
-      timeout: 30000,
-    };
+    // Retry logic for residential proxy (different IP each attempt)
+    const MAX_RETRIES = 3;
+    let lastError: Error | null = null;
+    let result: unknown = null;
 
-    // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
-    if (config.proxy) {
-      console.log(`[${clientId}] Using residential proxy with HttpsProxyAgent`);
-      const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
-      const httpsAgent = new HttpsProxyAgent(proxyUrl, {
-        rejectUnauthorized: false, // Skip cert validation through proxy tunnel
-      });
-      axiosConfig.httpsAgent = httpsAgent;
-      axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const axiosConfig: AxiosRequestConfig = {
+          headers: {
+            'Content-Type': 'application/json-patch+json',
+            'Authorization': `Bearer ${config.backend.api_token}`,
+            'User-Agent': 'Mozilla/5.0',
+          },
+          timeout: 30000,
+        };
+
+        // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
+        if (config.proxy) {
+          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy`);
+          const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
+          const httpsAgent = new HttpsProxyAgent(proxyUrl, {
+            rejectUnauthorized: false, // Skip cert validation through proxy tunnel
+          });
+          axiosConfig.httpsAgent = httpsAgent;
+          axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
+        }
+
+        const response = await axios.post(config.backend.api_url, playerData, axiosConfig);
+
+        if (response.headers['content-type']?.includes('text/html')) {
+          const htmlPreview = typeof response.data === 'string'
+            ? response.data.substring(0, 500)
+            : 'Unable to read HTML';
+          console.error(`[${clientId}] Attempt ${attempt} - Backend returned HTML:`, htmlPreview);
+          throw new Error('Backend returned HTML - IP might be blocked');
+        }
+
+        if (response.status !== 200 && response.status !== 201) {
+          throw new Error(`Backend error: ${response.status}`);
+        }
+
+        result = response.data;
+        console.log(`[${clientId}] Player created on attempt ${attempt}:`, result);
+        break; // Success, exit retry loop
+
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} failed:`, lastError.message);
+
+        if (attempt < MAX_RETRIES) {
+          // Wait a bit before retrying (new proxy IP)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
     }
 
-    const response = await axios.post(config.backend.api_url, playerData, axiosConfig);
-
-    if (response.headers['content-type']?.includes('text/html')) {
-      throw new Error('Backend returned HTML - IP might be blocked');
+    if (!result) {
+      throw lastError || new Error('All retry attempts failed');
     }
-
-    if (response.status !== 200 && response.status !== 201) {
-      throw new Error(`Backend error: ${response.status}`);
-    }
-
-    const result = response.data;
-    console.log(`[${clientId}] Player created:`, result);
 
     // Update KOMMO custom fields
     const customFieldsUpdated = await updateLeadCustomFields(leadId, username, password, config);
