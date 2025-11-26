@@ -339,7 +339,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw new Error('Backend returned HTML - IP might be blocked');
     }
 
-    if (response.status !== 200) {
+    if (response.status !== 200 && response.status !== 201) {
       throw new Error(`Backend error: ${response.status}`);
     }
 
