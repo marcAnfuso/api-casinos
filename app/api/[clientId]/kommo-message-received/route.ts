@@ -111,33 +111,84 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const payload = await request.json();
     console.log(`[${clientId}] Message webhook:`, JSON.stringify(payload, null, 2));
 
-    // Extract message data
-    const message = payload.message || payload;
-    const leadId = message.entity_id;
-    const messageType = message.message_type;
-    const attachments = message.attachments || [];
+    // Extract message data - handle both Chats API and standard webhook formats
+    // Chats API format: { message: { sender, receiver, conversation, message: { type, media, ... } } }
+    // Standard format: { message: { entity_id, message_type, attachments: [...] } }
 
-    console.log(`[${clientId}] Message data:`, {
-      leadId,
-      messageType,
-      hasAttachments: attachments.length > 0,
-    });
+    let leadId: number | null = null;
+    let isIncoming = false;
+    let attachmentType: string | null = null;
+    let fileName = 'unknown';
+    let fileUrl: string | undefined;
+
+    // Check for Chats API format (message.message.type exists)
+    if (payload.message?.message?.type) {
+      const chatMessage = payload.message;
+      const innerMessage = chatMessage.message;
+
+      // Get lead/conversation ID
+      leadId = chatMessage.conversation?.id || chatMessage.talk_id || null;
+
+      // In Chats API, incoming messages have sender info
+      isIncoming = !!chatMessage.sender?.id;
+
+      // Media type mapping: picture, video, file, voice, audio, sticker
+      const mediaTypes: Record<string, string> = {
+        'picture': 'image',
+        'video': 'file',
+        'file': 'file',
+        'voice': 'file',
+        'audio': 'file',
+        'sticker': 'image',
+      };
+
+      attachmentType = mediaTypes[innerMessage.type] || null;
+      fileName = innerMessage.file_name || 'unknown';
+      fileUrl = innerMessage.media;
+
+      console.log(`[${clientId}] Chats API format detected:`, {
+        leadId,
+        isIncoming,
+        messageType: innerMessage.type,
+        attachmentType,
+        fileName,
+        hasMedia: !!fileUrl,
+      });
+    }
+    // Fallback to standard webhook format
+    else {
+      const message = payload.message || payload;
+      leadId = message.entity_id;
+      isIncoming = message.message_type === 'in';
+
+      const attachments = message.attachments || [];
+      if (attachments.length > 0) {
+        const attachment = attachments[0];
+        attachmentType = attachment.type;
+        fileName = attachment.file_name || attachment.name || 'unknown';
+        fileUrl = attachment.link || attachment.url;
+      }
+
+      console.log(`[${clientId}] Standard format detected:`, {
+        leadId,
+        isIncoming,
+        hasAttachments: !!attachmentType,
+      });
+    }
 
     // Only process incoming messages
-    if (messageType !== 'in') {
+    if (!isIncoming) {
       return NextResponse.json({ success: true, message: 'Outgoing message ignored' });
     }
 
     // Check for attachments
-    if (attachments.length === 0) {
-      return NextResponse.json({ success: true, message: 'No attachment found' });
+    if (!attachmentType || !fileUrl) {
+      return NextResponse.json({ success: true, message: 'No media attachment found' });
     }
 
-    // Validate attachment type
-    const attachment = attachments[0];
-    const attachmentType = attachment.type;
-    const fileName = attachment.file_name || attachment.name || 'unknown';
-    const fileUrl = attachment.link || attachment.url;
+    if (!leadId) {
+      return NextResponse.json({ success: false, error: 'Could not extract lead/conversation ID' }, { status: 400 });
+    }
 
     const validTypes = ['image', 'file'];
     if (!validTypes.includes(attachmentType)) {
