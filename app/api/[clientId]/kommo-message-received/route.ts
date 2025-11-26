@@ -420,21 +420,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const esperandoStatusId = config.kommo.esperando_comprobante_status_id;
+    const noRecibidoStatusId = config.kommo.comprobante_no_recibido_status_id;
+
     if (!esperandoStatusId) {
       console.log(`[${clientId}] esperando_comprobante_status_id not configured`);
       return NextResponse.json({ success: true, message: 'Status check not configured' });
     }
 
-    if (leadData.statusId !== esperandoStatusId) {
-      console.log(`[${clientId}] Lead not in ESPERANDO_COMPROBANTE (current: ${leadData.statusId}, expected: ${esperandoStatusId}) - ignoring`);
+    // Accept messages from leads in ESPERANDO_COMPROBANTE or COMPROBANTE_NO_RECIBIDO (for retries)
+    const validStatuses = [esperandoStatusId, noRecibidoStatusId].filter(Boolean);
+    if (!validStatuses.includes(leadData.statusId)) {
+      console.log(`[${clientId}] Lead not in valid stage (current: ${leadData.statusId}, valid: ${validStatuses.join(', ')}) - ignoring`);
       return NextResponse.json({
         success: true,
-        message: 'Lead not in ESPERANDO_COMPROBANTE stage - message ignored',
-        data: { leadId, currentStatus: leadData.statusId, expectedStatus: esperandoStatusId }
+        message: 'Lead not in valid stage for proof processing - message ignored',
+        data: { leadId, currentStatus: leadData.statusId, validStatuses }
       });
     }
 
-    console.log(`[${clientId}] Lead is in ESPERANDO_COMPROBANTE - processing attachment...`);
+    console.log(`[${clientId}] Lead is in valid stage (${leadData.statusId}) - processing attachment...`);
 
     // No attachment → handle no proof
     if (!attachmentType || !fileUrl) {
