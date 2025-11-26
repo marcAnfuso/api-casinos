@@ -11,6 +11,88 @@ interface LeadData {
   statusId: number;
 }
 
+interface LastMessage {
+  fileUrl: string;
+  fileName: string;
+  messageType: string;
+}
+
+/**
+ * Obtiene el último mensaje del lead usando la API de eventos/notas
+ */
+async function getLastLeadMessage(leadId: number, config: ClientConfig): Promise<LastMessage | null> {
+  if (!config.kommo.access_token || !config.kommo.subdomain) {
+    return null;
+  }
+
+  try {
+    // First try: Get events filtered by lead
+    const eventsResponse = await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/events?filter[entity]=lead&filter[entity_id]=${leadId}&limit=10`,
+      {
+        headers: {
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+      }
+    );
+
+    if (eventsResponse.ok) {
+      const eventsData = await eventsResponse.json();
+      console.log('[KOMMO] Events response:', JSON.stringify(eventsData, null, 2));
+
+      // Look for incoming_chat_message or attachment events
+      if (eventsData._embedded?.events) {
+        for (const event of eventsData._embedded.events) {
+          // Check for chat message with media
+          if (event.type === 'incoming_chat_message' && event.value_after) {
+            const messageData = event.value_after[0];
+            if (messageData?.message?.media) {
+              return {
+                fileUrl: messageData.message.media,
+                fileName: messageData.message.file_name || 'attachment',
+                messageType: messageData.message.type || 'file',
+              };
+            }
+          }
+        }
+      }
+    }
+
+    // Second try: Get notes from the lead
+    const notesResponse = await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}/notes?limit=10`,
+      {
+        headers: {
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+      }
+    );
+
+    if (notesResponse.ok) {
+      const notesData = await notesResponse.json();
+      console.log('[KOMMO] Notes response:', JSON.stringify(notesData, null, 2));
+
+      // Look for notes with attachments
+      if (notesData._embedded?.notes) {
+        for (const note of notesData._embedded.notes) {
+          if (note.params?.file_uuid || note.params?.link) {
+            return {
+              fileUrl: note.params.link || `https://${config.kommo.subdomain}.kommo.com/download/${note.params.file_uuid}`,
+              fileName: note.params.file_name || 'attachment',
+              messageType: 'file',
+            };
+          }
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[KOMMO] Error fetching last message:', error);
+    return null;
+  }
+}
+
 /**
  * Obtiene datos del lead (intentos y status actual)
  */
@@ -232,8 +314,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     let fileName = 'unknown';
     let fileUrl: string | undefined;
 
+    // Check for Salesbot webhook format (form-urlencoded with leads[add][0][id])
+    const salesbotLeadKey = Object.keys(payload).find(key => key.match(/leads\[(add|update)\]\[\d+\]\[id\]/));
+    if (salesbotLeadKey) {
+      leadId = parseInt(payload[salesbotLeadKey], 10);
+      isIncoming = true; // Salesbot triggers after user message
+
+      console.log(`[${clientId}] Salesbot webhook detected, lead ID: ${leadId}`);
+      console.log(`[${clientId}] Fetching last message from KOMMO API...`);
+
+      // Fetch the last message from the lead
+      const lastMessage = await getLastLeadMessage(leadId, config);
+
+      if (lastMessage) {
+        fileUrl = lastMessage.fileUrl;
+        fileName = lastMessage.fileName;
+        attachmentType = lastMessage.messageType === 'picture' ? 'image' : 'file';
+        console.log(`[${clientId}] Found message:`, { fileUrl, fileName, attachmentType });
+      } else {
+        console.log(`[${clientId}] No attachment found in recent messages`);
+      }
+    }
     // Check for Chats API format
-    if (payload.message?.message?.type) {
+    else if (payload.message?.message?.type) {
       const chatMessage = payload.message;
       const innerMessage = chatMessage.message;
 
