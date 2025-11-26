@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientConfig, ClientConfig } from '@/lib/config';
+import { validatePaymentProof } from '@/lib/vision-validator';
 
 interface RouteParams {
   params: Promise<{ clientId: string }>;
@@ -146,6 +147,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    // Validate with AI Vision (only for images with URL)
+    let aiValidation = { isPaymentProof: true, confidence: 'low' as const, reason: 'Skipped' };
+    if (attachmentType === 'image' && fileUrl) {
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      aiValidation = await validatePaymentProof(fileUrl, geminiApiKey);
+
+      console.log(`[${clientId}] AI Validation:`, aiValidation);
+
+      if (!aiValidation.isPaymentProof) {
+        console.log(`[${clientId}] ❌ Image rejected - not a payment proof: ${aiValidation.reason}`);
+        return NextResponse.json({
+          success: true,
+          message: 'Image is not a payment proof',
+          client: clientId,
+          data: {
+            leadId,
+            attachmentType,
+            fileName,
+            aiValidation,
+          },
+        });
+      }
+    }
+
     console.log(`[${clientId}] ✅ Payment proof detected!`);
 
     // Change lead status
@@ -164,6 +189,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         attachmentType,
         fileName,
         statusChanged,
+        aiValidation,
       },
     });
 
