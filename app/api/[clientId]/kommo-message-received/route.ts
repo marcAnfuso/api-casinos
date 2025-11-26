@@ -321,19 +321,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       leadId = parseInt(payload[messageEntityIdKey], 10);
       isIncoming = payload[`message[add][${idx}][type]`] === 'incoming';
 
-      // Check for media/file attachment
+      // Check for media/file attachment (multiple possible formats)
       const mediaUrl = payload[`message[add][${idx}][media]`];
       const fileAttachment = payload[`message[add][${idx}][file]`];
-      const messageMediaType = payload[`message[add][${idx}][message_type]`]; // picture, file, etc.
+      const attachmentLink = payload[`message[add][${idx}][attachment][link]`];
+      const attachmentTypeValue = payload[`message[add][${idx}][attachment][type]`];
+      const messageMediaType = payload[`message[add][${idx}][message_type]`];
 
-      if (mediaUrl || fileAttachment) {
-        fileUrl = mediaUrl || fileAttachment;
-        fileName = payload[`message[add][${idx}][file_name]`] || 'attachment';
-        attachmentType = messageMediaType === 'picture' ? 'image' : 'file';
+      if (mediaUrl || fileAttachment || attachmentLink) {
+        fileUrl = mediaUrl || fileAttachment || attachmentLink;
+        fileName = payload[`message[add][${idx}][file_name]`] || payload[`message[add][${idx}][attachment][file_name]`] || 'attachment';
+        // Determine type from attachment[type] or message_type
+        const typeValue = attachmentTypeValue || messageMediaType;
+        attachmentType = (typeValue === 'picture' || typeValue === 'image') ? 'image' : 'file';
       }
 
       console.log(`[${clientId}] Global message webhook:`, {
-        leadId, isIncoming, hasMedia: !!(mediaUrl || fileAttachment), messageMediaType
+        leadId, isIncoming, hasMedia: !!(mediaUrl || fileAttachment || attachmentLink), attachmentType, fileName
       });
     }
     // Check for Salesbot webhook format (form-urlencoded with leads[add][0][id])
