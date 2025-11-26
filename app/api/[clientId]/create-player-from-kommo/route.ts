@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios, { AxiosRequestConfig } from 'axios';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { getClientConfig, validateClientConfig, ClientConfig } from '@/lib/config';
 import { createGoogleContact } from '@/lib/google-contacts';
 
@@ -321,17 +322,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       timeout: 30000,
     };
 
-    // Add proxy if configured
+    // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
     if (config.proxy) {
-      console.log(`[${clientId}] Using residential proxy`);
-      axiosConfig.proxy = {
-        host: config.proxy.host,
-        port: config.proxy.port,
-        auth: {
-          username: config.proxy.username,
-          password: config.proxy.password,
-        },
-      };
+      console.log(`[${clientId}] Using residential proxy with HttpsProxyAgent`);
+      const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
+      const httpsAgent = new HttpsProxyAgent(proxyUrl, {
+        rejectUnauthorized: false, // Skip cert validation through proxy tunnel
+      });
+      axiosConfig.httpsAgent = httpsAgent;
+      axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
     }
 
     const response = await axios.post(config.backend.api_url, playerData, axiosConfig);
