@@ -42,6 +42,35 @@ export interface ClientConfig {
   proxy?: ProxyConfig;
 }
 
+interface RawClientConfig {
+  name: string;
+  kommo: {
+    access_token: string;
+    subdomain: string;
+    whatsapp_scope_id?: string;
+    username_field_id: number;
+    password_field_id: number;
+    comprobante_status_id: number;
+  };
+  backend: {
+    type: string;
+    api_url: string;
+    api_token: string;
+    skin_id?: string;
+  };
+  google?: {
+    client_id: string;
+    client_secret: string;
+    refresh_token: string;
+  };
+  proxy?: {
+    host: string;
+    port: string;
+    username: string;
+    password: string;
+  };
+}
+
 /**
  * Resolve environment variable references in config values
  * "env:VAR_NAME" → process.env.VAR_NAME
@@ -69,7 +98,7 @@ function resolveEnvVar(value: string | number | null | undefined): string | null
  * Get configuration for a specific client
  */
 export function getClientConfig(clientId: string): ClientConfig | null {
-  const rawConfig = (clientsConfig.clients as Record<string, any>)[clientId];
+  const rawConfig = (clientsConfig.clients as Record<string, RawClientConfig>)[clientId];
 
   if (!rawConfig) {
     console.error(`[Config] Client '${clientId}' not found in config`);

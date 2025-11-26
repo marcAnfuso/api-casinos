@@ -12,6 +12,12 @@ interface ContactData {
   email?: string;
 }
 
+interface GoogleContactPayload {
+  names: { givenName: string }[];
+  phoneNumbers: { value: string; type: string }[];
+  emailAddresses?: { value: string; type: string }[];
+}
+
 /**
  * Creates a new contact in Google Contacts
  */
@@ -44,7 +50,7 @@ export async function createGoogleContact(
     });
 
     // Prepare contact data
-    const contact: any = {
+    const contact: GoogleContactPayload = {
       names: [
         {
           givenName: data.name,
