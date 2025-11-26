@@ -324,7 +324,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           headers: {
             'Content-Type': 'application/json-patch+json',
             'Authorization': `Bearer ${config.backend.api_token}`,
-            'User-Agent': 'Mozilla/5.0',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
+            'Origin': 'https://admin.bet30.store',
+            'Referer': 'https://admin.bet30.store/',
           },
           timeout: 30000,
         };
