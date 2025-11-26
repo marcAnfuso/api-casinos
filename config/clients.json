@@ -9,7 +9,10 @@
         "username_field_id": 1492038,
         "password_field_id": 1492040,
         "comprobante_recibido_status_id": 97022603,
-        "comprobante_no_recibido_status_id": 97022971
+        "comprobante_no_recibido_status_id": 97022971,
+        "no_respondio_status_id": 90036483,
+        "intentos_comprobante_field_id": 1494398,
+        "max_intentos_comprobante": 3
       },
       "backend": {
         "type": "bet30",

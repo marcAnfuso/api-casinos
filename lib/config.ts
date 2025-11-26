@@ -13,6 +13,9 @@ export interface KommoConfig {
   password_field_id: number;
   comprobante_recibido_status_id?: number;
   comprobante_no_recibido_status_id?: number;
+  no_respondio_status_id?: number;
+  intentos_comprobante_field_id?: number;
+  max_intentos_comprobante?: number;
 }
 
 export interface BackendConfig {
@@ -53,6 +56,9 @@ interface RawClientConfig {
     password_field_id: number;
     comprobante_recibido_status_id?: number;
     comprobante_no_recibido_status_id?: number;
+    no_respondio_status_id?: number;
+    intentos_comprobante_field_id?: number;
+    max_intentos_comprobante?: number;
   };
   backend: {
     type: string;
@@ -118,6 +124,9 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       password_field_id: rawConfig.kommo.password_field_id,
       comprobante_recibido_status_id: rawConfig.kommo.comprobante_recibido_status_id,
       comprobante_no_recibido_status_id: rawConfig.kommo.comprobante_no_recibido_status_id,
+      no_respondio_status_id: rawConfig.kommo.no_respondio_status_id,
+      intentos_comprobante_field_id: rawConfig.kommo.intentos_comprobante_field_id,
+      max_intentos_comprobante: rawConfig.kommo.max_intentos_comprobante,
     },
     backend: {
       type: rawConfig.backend.type,
