@@ -207,8 +207,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const payload = await request.json();
-    console.log(`[${clientId}] Message webhook:`, JSON.stringify(payload, null, 2));
+    const contentType = request.headers.get('content-type');
+    const rawBody = await request.text();
+
+    // Parse payload (handle both JSON and form-urlencoded from KOMMO)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let payload: any;
+    if (contentType?.includes('application/x-www-form-urlencoded')) {
+      const params = new URLSearchParams(rawBody);
+      payload = {};
+      for (const [key, value] of params.entries()) {
+        payload[key] = value;
+      }
+      console.log(`[${clientId}] Message webhook (form-urlencoded):`, JSON.stringify(payload, null, 2));
+    } else {
+      payload = JSON.parse(rawBody);
+      console.log(`[${clientId}] Message webhook (JSON):`, JSON.stringify(payload, null, 2));
+    }
 
     // Extract message data
     let leadId: number | null = null;
