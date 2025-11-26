@@ -5,7 +5,7 @@
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
-interface ValidationResult {
+export interface ValidationResult {
   isPaymentProof: boolean;
   confidence: 'high' | 'medium' | 'low';
   reason: string;

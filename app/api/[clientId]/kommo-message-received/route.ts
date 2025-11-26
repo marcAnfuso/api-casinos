@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientConfig, ClientConfig } from '@/lib/config';
-import { validatePaymentProof } from '@/lib/vision-validator';
+import { validatePaymentProof, ValidationResult } from '@/lib/vision-validator';
 
 interface RouteParams {
   params: Promise<{ clientId: string }>;
@@ -286,7 +286,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Validate with AI Vision (only for images)
-    let aiValidation = { isPaymentProof: true, confidence: 'low' as const, reason: 'Skipped' };
+    let aiValidation: ValidationResult = { isPaymentProof: true, confidence: 'low', reason: 'Skipped' };
     if (attachmentType === 'image' && fileUrl) {
       const geminiApiKey = process.env.GEMINI_API_KEY;
       aiValidation = await validatePaymentProof(fileUrl, geminiApiKey);
