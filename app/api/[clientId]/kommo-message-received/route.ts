@@ -51,6 +51,68 @@ async function changeLeadStatus(leadId: number, config: ClientConfig): Promise<b
 }
 
 /**
+ * Actualiza el campo comprobante_recibido del lead
+ */
+async function updateComprobanteField(
+  leadId: number,
+  received: boolean,
+  config: ClientConfig
+): Promise<boolean> {
+  if (!config.kommo.access_token || !config.kommo.subdomain) {
+    console.warn('[KOMMO Message] KOMMO credentials not configured');
+    return false;
+  }
+
+  if (!config.kommo.comprobante_field_id) {
+    console.warn('[KOMMO Message] comprobante_field_id not configured');
+    return false;
+  }
+
+  const enumId = received
+    ? config.kommo.comprobante_si_enum_id
+    : config.kommo.comprobante_no_enum_id;
+
+  if (!enumId) {
+    console.warn('[KOMMO Message] comprobante enum IDs not configured');
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+        body: JSON.stringify({
+          custom_fields_values: [
+            {
+              field_id: config.kommo.comprobante_field_id,
+              values: [{ enum_id: enumId }],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[KOMMO Message] Field update error:', { status: response.status, body: errorText });
+      return false;
+    }
+
+    console.log(`[KOMMO Message] comprobante_recibido set to: ${received ? 'si' : 'no'}`);
+    return true;
+
+  } catch (error) {
+    console.error('[KOMMO Message] Field update error:', error);
+    return false;
+  }
+}
+
+/**
  * Agrega nota interna al lead con info del comprobante
  */
 async function addNoteToLead(
@@ -181,13 +243,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ success: true, message: 'Outgoing message ignored' });
     }
 
-    // Check for attachments
-    if (!attachmentType || !fileUrl) {
-      return NextResponse.json({ success: true, message: 'No media attachment found' });
-    }
-
     if (!leadId) {
       return NextResponse.json({ success: false, error: 'Could not extract lead/conversation ID' }, { status: 400 });
+    }
+
+    // Check for attachments - if none, set comprobante_recibido = no
+    if (!attachmentType || !fileUrl) {
+      console.log(`[${clientId}] No media attachment - setting comprobante_recibido = no`);
+      await updateComprobanteField(leadId, false, config);
+      return NextResponse.json({
+        success: true,
+        message: 'No media attachment - comprobante_recibido set to no',
+        client: clientId,
+        data: { leadId, comprobanteRecibido: 'no' },
+      });
     }
 
     const validTypes = ['image', 'file'];
@@ -207,22 +276,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       console.log(`[${clientId}] AI Validation:`, aiValidation);
 
       if (!aiValidation.isPaymentProof) {
-        console.log(`[${clientId}] ❌ Image rejected - not a payment proof: ${aiValidation.reason}`);
+        console.log(`[${clientId}] Image rejected - not a payment proof: ${aiValidation.reason}`);
+        await updateComprobanteField(leadId, false, config);
         return NextResponse.json({
           success: true,
-          message: 'Image is not a payment proof',
+          message: 'Image is not a payment proof - comprobante_recibido set to no',
           client: clientId,
           data: {
             leadId,
             attachmentType,
             fileName,
             aiValidation,
+            comprobanteRecibido: 'no',
           },
         });
       }
     }
 
-    console.log(`[${clientId}] ✅ Payment proof detected!`);
+    console.log(`[${clientId}] Payment proof detected!`);
+
+    // Set comprobante_recibido = si
+    await updateComprobanteField(leadId, true, config);
 
     // Change lead status
     const statusChanged = await changeLeadStatus(leadId, config);
@@ -233,7 +307,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       success: true,
-      message: 'Proof received and lead status updated',
+      message: 'Proof received - comprobante_recibido set to si',
       client: clientId,
       data: {
         leadId,
@@ -241,6 +315,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         fileName,
         statusChanged,
         aiValidation,
+        comprobanteRecibido: 'si',
       },
     });
 

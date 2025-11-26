@@ -12,6 +12,9 @@ export interface KommoConfig {
   username_field_id: number;
   password_field_id: number;
   comprobante_status_id: number;
+  comprobante_field_id?: number;
+  comprobante_si_enum_id?: number;
+  comprobante_no_enum_id?: number;
 }
 
 export interface BackendConfig {
@@ -51,6 +54,9 @@ interface RawClientConfig {
     username_field_id: number;
     password_field_id: number;
     comprobante_status_id: number;
+    comprobante_field_id?: number;
+    comprobante_si_enum_id?: number;
+    comprobante_no_enum_id?: number;
   };
   backend: {
     type: string;
@@ -115,6 +121,9 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       username_field_id: rawConfig.kommo.username_field_id,
       password_field_id: rawConfig.kommo.password_field_id,
       comprobante_status_id: rawConfig.kommo.comprobante_status_id,
+      comprobante_field_id: rawConfig.kommo.comprobante_field_id,
+      comprobante_si_enum_id: rawConfig.kommo.comprobante_si_enum_id,
+      comprobante_no_enum_id: rawConfig.kommo.comprobante_no_enum_id,
     },
     backend: {
       type: rawConfig.backend.type,
