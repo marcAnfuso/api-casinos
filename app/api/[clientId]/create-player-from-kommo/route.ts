@@ -350,11 +350,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Update KOMMO custom fields
     const customFieldsUpdated = await updateLeadCustomFields(leadId, username, password, config);
 
-    // Create Google Contact
+    // Create Google Contact (using username as contact name)
     let googleContactCreated = false;
-    if (config.google && name && phone) {
+    if (config.google && phone) {
       googleContactCreated = await createGoogleContact(
-        { name, phone, email: email || undefined },
+        { name: username, phone, email: email || undefined },
         config.google
       );
     }
