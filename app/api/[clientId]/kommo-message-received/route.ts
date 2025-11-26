@@ -386,6 +386,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ success: false, error: 'Could not extract lead/conversation ID' }, { status: 400 });
     }
 
+    // Check if lead is in ESPERANDO_COMPROBANTE status
+    const leadData = await getLeadData(leadId, config);
+    if (!leadData) {
+      console.log(`[${clientId}] Could not fetch lead data`);
+      return NextResponse.json({ success: true, message: 'Could not fetch lead data' });
+    }
+
+    const esperandoStatusId = config.kommo.esperando_comprobante_status_id;
+    if (!esperandoStatusId) {
+      console.log(`[${clientId}] esperando_comprobante_status_id not configured`);
+      return NextResponse.json({ success: true, message: 'Status check not configured' });
+    }
+
+    if (leadData.statusId !== esperandoStatusId) {
+      console.log(`[${clientId}] Lead not in ESPERANDO_COMPROBANTE (current: ${leadData.statusId}, expected: ${esperandoStatusId}) - ignoring`);
+      return NextResponse.json({
+        success: true,
+        message: 'Lead not in ESPERANDO_COMPROBANTE stage - message ignored',
+        data: { leadId, currentStatus: leadData.statusId, expectedStatus: esperandoStatusId }
+      });
+    }
+
+    console.log(`[${clientId}] Lead is in ESPERANDO_COMPROBANTE - processing attachment...`);
+
     // No attachment → handle no proof
     if (!attachmentType || !fileUrl) {
       console.log(`[${clientId}] No media attachment`);
