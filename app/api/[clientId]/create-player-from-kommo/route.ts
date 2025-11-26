@@ -314,7 +314,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     };
 
     // Retry logic for residential proxy (different IP each attempt)
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY_MS = 10000; // 10 seconds between retries
     let lastError: Error | null = null;
     let result: unknown = null;
 
@@ -367,8 +368,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         console.error(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} failed:`, lastError.message);
 
         if (attempt < MAX_RETRIES) {
-          // Wait a bit before retrying (new proxy IP)
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Wait before retrying (new proxy IP)
+          console.log(`[${clientId}] Waiting ${RETRY_DELAY_MS / 1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
         }
       }
     }
