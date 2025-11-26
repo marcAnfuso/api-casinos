@@ -314,9 +314,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     let fileName = 'unknown';
     let fileUrl: string | undefined;
 
+    // Check for global message webhook format (form-urlencoded with message[add][0][...])
+    const messageEntityIdKey = Object.keys(payload).find(key => key.match(/message\[add\]\[\d+\]\[entity_id\]/));
+    if (messageEntityIdKey) {
+      const idx = messageEntityIdKey.match(/message\[add\]\[(\d+)\]/)?.[1] || '0';
+      leadId = parseInt(payload[messageEntityIdKey], 10);
+      isIncoming = payload[`message[add][${idx}][type]`] === 'incoming';
+
+      // Check for media/file attachment
+      const mediaUrl = payload[`message[add][${idx}][media]`];
+      const fileAttachment = payload[`message[add][${idx}][file]`];
+      const messageMediaType = payload[`message[add][${idx}][message_type]`]; // picture, file, etc.
+
+      if (mediaUrl || fileAttachment) {
+        fileUrl = mediaUrl || fileAttachment;
+        fileName = payload[`message[add][${idx}][file_name]`] || 'attachment';
+        attachmentType = messageMediaType === 'picture' ? 'image' : 'file';
+      }
+
+      console.log(`[${clientId}] Global message webhook:`, {
+        leadId, isIncoming, hasMedia: !!(mediaUrl || fileAttachment), messageMediaType
+      });
+    }
     // Check for Salesbot webhook format (form-urlencoded with leads[add][0][id])
-    const salesbotLeadKey = Object.keys(payload).find(key => key.match(/leads\[(add|update)\]\[\d+\]\[id\]/));
-    if (salesbotLeadKey) {
+    else if (Object.keys(payload).find(key => key.match(/leads\[(add|update)\]\[\d+\]\[id\]/))) {
+      const salesbotLeadKey = Object.keys(payload).find(key => key.match(/leads\[(add|update)\]\[\d+\]\[id\]/))!;
       leadId = parseInt(payload[salesbotLeadKey], 10);
       isIncoming = true; // Salesbot triggers after user message
 
