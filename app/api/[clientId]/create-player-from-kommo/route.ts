@@ -168,11 +168,13 @@ async function updateLeadCustomFields(
 }
 
 /**
- * Genera username con formato: bet + 8 dígitos random
+ * Genera username con formato configurable: prefix + N dígitos random
  */
-function generateUsername(): string {
-  const randomDigits = Math.floor(10000000 + Math.random() * 90000000);
-  return `bet${randomDigits}`;
+function generateUsername(prefix: string = 'vet', digits: number = 4): string {
+  const min = Math.pow(10, digits - 1);
+  const max = Math.pow(10, digits) - 1;
+  const randomDigits = Math.floor(min + Math.random() * (max - min + 1));
+  return `${prefix}${randomDigits}`;
 }
 
 /**
@@ -298,29 +300,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Generate credentials
-    const username = generateUsername();
+    // Generate credentials using client config
+    const usernamePrefix = config.backend.username_prefix || 'vet';
+    const usernameDigits = config.backend.username_digits || 4;
+    let username = generateUsername(usernamePrefix, usernameDigits);
     const password = generatePassword();
 
     console.log(`[${clientId}] Creating player:`, { username, name, phone });
 
-    // Create player in backend (with proxy if configured)
-    const playerData = {
-      userName: username,
-      password: password,
-      skinId: config.backend.skin_id,
-      agentId: null,
-      language: 'es',
-    };
-
-    // Retry logic for residential proxy (different IP each attempt)
+    // Retry logic for residential proxy (different IP each attempt) and duplicate username
     const MAX_RETRIES = 5;
+    const MAX_USERNAME_RETRIES = 3;
     const RETRY_DELAY_MS = 10000; // 10 seconds between retries
     let lastError: Error | null = null;
     let result: unknown = null;
+    let usernameAttempts = 0;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
+        // Create player data with current username
+        const playerData = {
+          userName: username,
+          password: password,
+          skinId: config.backend.skin_id,
+          agentId: null,
+          language: 'es',
+        };
+
         const axiosConfig: AxiosRequestConfig = {
           headers: {
             'Content-Type': 'application/json-patch+json',
@@ -359,7 +365,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           throw new Error(`Backend error: ${response.status}`);
         }
 
-        result = response.data;
+        // Check if response indicates duplicate username error
+        const responseData = response.data;
+        if (responseData?.result === 'ERROR' || responseData?.success === false) {
+          usernameAttempts++;
+          if (usernameAttempts < MAX_USERNAME_RETRIES) {
+            console.log(`[${clientId}] Username ${username} already exists, generating new one (attempt ${usernameAttempts}/${MAX_USERNAME_RETRIES})`);
+            username = generateUsername(usernamePrefix, usernameDigits);
+            continue; // Retry with new username without waiting
+          } else {
+            throw new Error('Max username generation attempts reached');
+          }
+        }
+
+        result = responseData;
         console.log(`[${clientId}] Player created on attempt ${attempt}:`, result);
         break; // Success, exit retry loop
 

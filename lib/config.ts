@@ -24,6 +24,8 @@ export interface BackendConfig {
   api_url: string;
   api_token: string;
   skin_id?: string;
+  username_prefix?: string;
+  username_digits?: number;
 }
 
 export interface GoogleConfig {
@@ -67,6 +69,8 @@ interface RawClientConfig {
     api_url: string;
     api_token: string;
     skin_id?: string;
+    username_prefix?: string;
+    username_digits?: number;
   };
   google?: {
     client_id: string;
@@ -136,6 +140,8 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       api_url: rawConfig.backend.api_url,
       api_token: resolveEnvVar(rawConfig.backend.api_token) || '',
       skin_id: rawConfig.backend.skin_id,
+      username_prefix: rawConfig.backend.username_prefix,
+      username_digits: rawConfig.backend.username_digits,
     },
   };
 

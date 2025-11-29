@@ -8,9 +8,10 @@
         "whatsapp_scope_id": "env:BET30_KOMMO_WHATSAPP_SCOPE_ID",
         "username_field_id": 1492038,
         "password_field_id": 1492040,
-        "esperando_comprobante_status_id": 97065031,
-        "comprobante_recibido_status_id": 97022603,
-        "comprobante_no_recibido_status_id": 97022971,
+        "pipeline_id": 11709408,
+        "esperando_comprobante_status_id": 97211815,
+        "comprobante_recibido_status_id": 97211819,
+        "comprobante_no_recibido_status_id": 97216287,
         "no_respondio_status_id": 90036483,
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3
@@ -19,7 +20,9 @@
         "type": "bet30",
         "api_url": "https://admin.bet30.store/api/services/app/Players/AddPlayer",
         "api_token": "env:BET30_PLAYER_API_TOKEN",
-        "skin_id": "1025c6bf14cd"
+        "skin_id": "1025c6bf14cd",
+        "username_prefix": "vet",
+        "username_digits": 4
       },
       "google": {
         "client_id": "env:BET30_GOOGLE_CLIENT_ID",
