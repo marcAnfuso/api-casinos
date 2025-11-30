@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClientConfig, ClientConfig } from '@/lib/config';
 import { validatePaymentProof, ValidationResult } from '@/lib/vision-validator';
+import { extractFbclidFromMessage } from '@/lib/meta-capi';
 
 interface RouteParams {
   params: Promise<{ clientId: string }>;
@@ -194,6 +195,53 @@ async function updateLeadStatus(
 }
 
 /**
+ * Guarda el fbclid extraído del mensaje en un custom field del lead
+ */
+async function saveFbclidToLead(
+  leadId: number,
+  fbclid: string,
+  config: ClientConfig
+): Promise<boolean> {
+  if (!config.kommo.access_token || !config.kommo.subdomain || !config.kommo.fbclid_field_id) {
+    console.log('[KOMMO] fbclid_field_id not configured, skipping fbclid save');
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+        body: JSON.stringify({
+          custom_fields_values: [
+            {
+              field_id: config.kommo.fbclid_field_id,
+              values: [{ value: fbclid }],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[KOMMO] Error saving fbclid:', { status: response.status, body: errorText });
+      return false;
+    }
+
+    console.log(`[KOMMO] Saved fbclid to lead ${leadId}: ${fbclid.substring(0, 20)}...`);
+    return true;
+  } catch (error) {
+    console.error('[KOMMO] Error saving fbclid:', error);
+    return false;
+  }
+}
+
+/**
  * Agrega nota interna al lead
  */
 async function addNoteToLead(
@@ -313,6 +361,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     let attachmentType: string | null = null;
     let fileName = 'unknown';
     let fileUrl: string | undefined;
+    let messageText: string | null = null;  // For extracting [REF:fbclid]
 
     // Check for global message webhook format (form-urlencoded with message[add][0][...])
     const messageEntityIdKey = Object.keys(payload).find(key => key.match(/message\[add\]\[\d+\]\[entity_id\]/));
@@ -320,6 +369,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const idx = messageEntityIdKey.match(/message\[add\]\[(\d+)\]/)?.[1] || '0';
       leadId = parseInt(payload[messageEntityIdKey], 10);
       isIncoming = payload[`message[add][${idx}][type]`] === 'incoming';
+
+      // Extract message text for fbclid tracking
+      messageText = payload[`message[add][${idx}][text]`] || null;
 
       // Check for media/file attachment (multiple possible formats)
       const mediaUrl = payload[`message[add][${idx}][media]`];
@@ -337,7 +389,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       console.log(`[${clientId}] Global message webhook:`, {
-        leadId, isIncoming, hasMedia: !!(mediaUrl || fileAttachment || attachmentLink), attachmentType, fileName
+        leadId, isIncoming, hasMedia: !!(mediaUrl || fileAttachment || attachmentLink), attachmentType, fileName, hasText: !!messageText
       });
     }
     // Check for Salesbot webhook format (form-urlencoded with leads[add][0][id])
@@ -381,9 +433,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       attachmentType = mediaTypes[innerMessage.type] || null;
       fileName = innerMessage.file_name || 'unknown';
       fileUrl = innerMessage.media;
+      messageText = innerMessage.text || null;
 
       console.log(`[${clientId}] Chats API format:`, {
-        leadId, isIncoming, messageType: innerMessage.type, attachmentType, hasMedia: !!fileUrl,
+        leadId, isIncoming, messageType: innerMessage.type, attachmentType, hasMedia: !!fileUrl, hasText: !!messageText,
       });
     }
     // Fallback to standard webhook format
@@ -391,6 +444,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const message = payload.message || payload;
       leadId = message.entity_id;
       isIncoming = message.message_type === 'in';
+      messageText = message.text || null;
 
       const attachments = message.attachments || [];
       if (attachments.length > 0) {
@@ -400,7 +454,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         fileUrl = attachment.link || attachment.url;
       }
 
-      console.log(`[${clientId}] Standard format:`, { leadId, isIncoming, hasAttachments: !!attachmentType });
+      console.log(`[${clientId}] Standard format:`, { leadId, isIncoming, hasAttachments: !!attachmentType, hasText: !!messageText });
     }
 
     // Only process incoming messages
@@ -410,6 +464,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!leadId) {
       return NextResponse.json({ success: false, error: 'Could not extract lead/conversation ID' }, { status: 400 });
+    }
+
+    // Extract and save fbclid from message text [REF:xxx]
+    if (messageText) {
+      const fbclid = extractFbclidFromMessage(messageText);
+      if (fbclid) {
+        console.log(`[${clientId}] Found fbclid in message: ${fbclid.substring(0, 30)}...`);
+        await saveFbclidToLead(leadId, fbclid, config);
+      }
     }
 
     // Check if lead is in ESPERANDO_COMPROBANTE status

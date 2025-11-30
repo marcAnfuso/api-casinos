@@ -15,8 +15,17 @@ export interface KommoConfig {
   comprobante_recibido_status_id?: number;
   comprobante_no_recibido_status_id?: number;
   no_respondio_status_id?: number;
+  transferido_status_id?: number;  // Status when deposit is confirmed (triggers Meta CAPI)
   intentos_comprobante_field_id?: number;
   max_intentos_comprobante?: number;
+  fbclid_field_id?: number;  // Custom field to store fbclid from [REF:xxx]
+  monto_field_id?: number;   // Custom field with deposit amount
+}
+
+export interface MetaConfig {
+  pixel_id: string;
+  access_token: string;
+  test_event_code?: string;  // For testing in Meta Events Manager
 }
 
 export interface BackendConfig {
@@ -47,6 +56,7 @@ export interface ClientConfig {
   backend: BackendConfig;
   google?: GoogleConfig;
   proxy?: ProxyConfig;
+  meta?: MetaConfig;
 }
 
 interface RawClientConfig {
@@ -61,8 +71,11 @@ interface RawClientConfig {
     comprobante_recibido_status_id?: number;
     comprobante_no_recibido_status_id?: number;
     no_respondio_status_id?: number;
+    transferido_status_id?: number;
     intentos_comprobante_field_id?: number;
     max_intentos_comprobante?: number;
+    fbclid_field_id?: number;
+    monto_field_id?: number;
   };
   backend: {
     type: string;
@@ -82,6 +95,11 @@ interface RawClientConfig {
     port: string;
     username: string;
     password: string;
+  };
+  meta?: {
+    pixel_id: string;
+    access_token: string;
+    test_event_code?: string;
   };
 }
 
@@ -132,8 +150,11 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       comprobante_recibido_status_id: rawConfig.kommo.comprobante_recibido_status_id,
       comprobante_no_recibido_status_id: rawConfig.kommo.comprobante_no_recibido_status_id,
       no_respondio_status_id: rawConfig.kommo.no_respondio_status_id,
+      transferido_status_id: rawConfig.kommo.transferido_status_id,
       intentos_comprobante_field_id: rawConfig.kommo.intentos_comprobante_field_id,
       max_intentos_comprobante: rawConfig.kommo.max_intentos_comprobante,
+      fbclid_field_id: rawConfig.kommo.fbclid_field_id,
+      monto_field_id: rawConfig.kommo.monto_field_id,
     },
     backend: {
       type: rawConfig.backend.type,
@@ -173,6 +194,21 @@ export function getClientConfig(clientId: string): ClientConfig | null {
         port: parseInt(port),
         username,
         password,
+      };
+    }
+  }
+
+  // Add Meta CAPI config if present
+  if (rawConfig.meta) {
+    const pixelId = resolveEnvVar(rawConfig.meta.pixel_id);
+    const metaAccessToken = resolveEnvVar(rawConfig.meta.access_token);
+    const testEventCode = rawConfig.meta.test_event_code;
+
+    if (pixelId && metaAccessToken) {
+      config.meta = {
+        pixel_id: pixelId,
+        access_token: metaAccessToken,
+        test_event_code: testEventCode,
       };
     }
   }

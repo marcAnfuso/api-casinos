@@ -13,8 +13,11 @@
         "comprobante_recibido_status_id": 97211819,
         "comprobante_no_recibido_status_id": 97216287,
         "no_respondio_status_id": 90036483,
+        "transferido_status_id": 0,
         "intentos_comprobante_field_id": 1494398,
-        "max_intentos_comprobante": 3
+        "max_intentos_comprobante": 3,
+        "fbclid_field_id": 0,
+        "monto_field_id": 0
       },
       "backend": {
         "type": "bet30",
@@ -34,6 +37,11 @@
         "port": "env:DECODO_PROXY_PORT",
         "username": "env:DECODO_PROXY_USERNAME",
         "password": "env:DECODO_PROXY_PASSWORD"
+      },
+      "meta": {
+        "pixel_id": "env:META_PIXEL_ID",
+        "access_token": "env:META_CAPI_ACCESS_TOKEN",
+        "test_event_code": ""
       }
     }
   }
