@@ -155,10 +155,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       leadId = parseInt(payload[statusLeadKey], 10);
     }
     // Check for leads[update][0][id] format
-    else {
+    if (!leadId) {
       const updateLeadKey = Object.keys(payload).find(key => key.match(/leads\[update\]\[\d+\]\[id\]/));
       if (updateLeadKey) {
         leadId = parseInt(payload[updateLeadKey], 10);
+      }
+    }
+    // Check for leads[add][0][id] format (new lead webhook)
+    if (!leadId) {
+      const addLeadKey = Object.keys(payload).find(key => key.match(/leads\[add\]\[\d+\]\[id\]/));
+      if (addLeadKey) {
+        leadId = parseInt(payload[addLeadKey], 10);
       }
     }
 
@@ -168,6 +175,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     if (!leadId && payload.leads?.update?.[0]?.id) {
       leadId = payload.leads.update[0].id;
+    }
+    if (!leadId && payload.leads?.add?.[0]?.id) {
+      leadId = payload.leads.add[0].id;
     }
 
     if (!leadId) {
