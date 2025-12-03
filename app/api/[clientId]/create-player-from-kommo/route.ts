@@ -208,6 +208,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  // This endpoint requires backend config for player creation
+  if (!config.backend) {
+    return NextResponse.json(
+      { success: false, error: 'Backend not configured for this client' },
+      { status: 400 }
+    );
+  }
+
   try {
     const contentType = request.headers.get('content-type');
     const rawBody = await request.text();

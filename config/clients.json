@@ -1,5 +1,20 @@
 {
   "clients": {
+    "oropuro": {
+      "name": "Oro Puro",
+      "kommo": {
+        "access_token": "env:OROPURO_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lionel0318a",
+        "transferido_status_id": 84459751,
+        "fbclid_field_id": 1106597,
+        "monto_field_id": 1106599
+      },
+      "meta": {
+        "pixel_id": "env:OROPURO_META_PIXEL_ID",
+        "access_token": "env:OROPURO_META_ACCESS_TOKEN",
+        "test_event_code": ""
+      }
+    },
     "bet30": {
       "name": "bet30",
       "kommo": {

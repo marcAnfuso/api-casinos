@@ -9,8 +9,8 @@ export interface KommoConfig {
   access_token: string;
   subdomain: string;
   whatsapp_scope_id?: string;
-  username_field_id: number;
-  password_field_id: number;
+  username_field_id?: number;  // Optional - only for player creation
+  password_field_id?: number;  // Optional - only for player creation
   esperando_comprobante_status_id?: number;
   comprobante_recibido_status_id?: number;
   comprobante_no_recibido_status_id?: number;
@@ -53,7 +53,7 @@ export interface ProxyConfig {
 export interface ClientConfig {
   name: string;
   kommo: KommoConfig;
-  backend: BackendConfig;
+  backend?: BackendConfig;  // Optional - not all clients need player creation
   google?: GoogleConfig;
   proxy?: ProxyConfig;
   meta?: MetaConfig;
@@ -65,8 +65,8 @@ interface RawClientConfig {
     access_token: string;
     subdomain: string;
     whatsapp_scope_id?: string;
-    username_field_id: number;
-    password_field_id: number;
+    username_field_id?: number;  // Optional - only for player creation
+    password_field_id?: number;  // Optional - only for player creation
     esperando_comprobante_status_id?: number;
     comprobante_recibido_status_id?: number;
     comprobante_no_recibido_status_id?: number;
@@ -77,7 +77,7 @@ interface RawClientConfig {
     fbclid_field_id?: number;
     monto_field_id?: number;
   };
-  backend: {
+  backend?: {  // Optional - not all clients need player creation
     type: string;
     api_url: string;
     api_token: string;
@@ -156,15 +156,19 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       fbclid_field_id: rawConfig.kommo.fbclid_field_id,
       monto_field_id: rawConfig.kommo.monto_field_id,
     },
-    backend: {
+  };
+
+  // Add backend config if present
+  if (rawConfig.backend) {
+    config.backend = {
       type: rawConfig.backend.type,
       api_url: rawConfig.backend.api_url,
       api_token: resolveEnvVar(rawConfig.backend.api_token) || '',
       skin_id: rawConfig.backend.skin_id,
       username_prefix: rawConfig.backend.username_prefix,
       username_digits: rawConfig.backend.username_digits,
-    },
-  };
+    };
+  }
 
   // Add Google config if present
   if (rawConfig.google) {
@@ -225,6 +229,7 @@ export function getAvailableClients(): string[] {
 
 /**
  * Validate that a client has all required config
+ * Note: Only validates KOMMO config as mandatory. Backend is optional.
  */
 export function validateClientConfig(config: ClientConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -235,6 +240,23 @@ export function validateClientConfig(config: ClientConfig): { valid: boolean; er
 
   if (!config.kommo.subdomain) {
     errors.push('KOMMO subdomain is missing');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validate that a client has backend config (for player creation)
+ */
+export function validateBackendConfig(config: ClientConfig): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!config.backend) {
+    errors.push('Backend config is missing');
+    return { valid: false, errors };
   }
 
   if (!config.backend.api_token) {
