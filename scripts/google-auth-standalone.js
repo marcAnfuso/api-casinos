@@ -15,8 +15,8 @@ const readline = require('readline');
 
 // Configuración
 const SCOPES = ['https://www.googleapis.com/auth/contacts'];
-const REDIRECT_URI = 'http://localhost:3000';
-const PORT = 3000;
+const REDIRECT_URI = 'http://localhost:3001';
+const PORT = 3001;
 
 const rl = readline.createInterface({
   input: process.stdin,

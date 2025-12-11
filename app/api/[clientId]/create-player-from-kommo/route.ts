@@ -298,11 +298,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
         // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
         if (config.proxy) {
-          // Add random session ID to force new IP on each attempt (Decodo feature)
-          const sessionId = `session-${Date.now()}-${attempt}`;
-          const proxyUsername = `${config.proxy.username}-${sessionId}`;
-          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy (${sessionId})`);
-          const proxyUrl = `http://${proxyUsername}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
+          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy`);
+          const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
           const httpsAgent = new HttpsProxyAgent(proxyUrl, {
             rejectUnauthorized: false, // Skip cert validation through proxy tunnel
           });
