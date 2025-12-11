@@ -160,7 +160,20 @@ async function updateLeadCustomFields(
       }
     );
 
-    return response.ok;
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error('[KOMMO Create Player] Custom fields update failed:', {
+        status: response.status,
+        body: errorBody,
+        leadId,
+        username_field_id: config.kommo.username_field_id,
+        password_field_id: config.kommo.password_field_id,
+      });
+      return false;
+    }
+
+    console.log('[KOMMO Create Player] Custom fields updated successfully for lead:', leadId);
+    return true;
   } catch (error) {
     console.error('[KOMMO Create Player] Custom fields error:', error);
     return false;
