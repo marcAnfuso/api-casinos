@@ -265,9 +265,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.log(`[${clientId}] Creating player:`, { username, name, phone });
 
     // Retry logic for residential proxy (different IP each attempt) and duplicate username
-    const MAX_RETRIES = 5;
+    const MAX_RETRIES = 10;
     const MAX_USERNAME_RETRIES = 3;
-    const RETRY_DELAY_MS = 3000; // 3 seconds between retries
+    const RETRY_DELAY_MS = 2000; // 2 seconds between retries
     let lastError: Error | null = null;
     let result: unknown = null;
     let usernameAttempts = 0;
