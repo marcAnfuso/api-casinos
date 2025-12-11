@@ -39,8 +39,8 @@
         "api_url": "https://admin.bet30.blog/api/services/app/Players/AddPlayer",
         "api_token": "env:BET30_PLAYER_API_TOKEN",
         "skin_id": "1025c6bf14cd",
-        "username_prefix": "vet",
-        "username_digits": 4
+        "username_prefix": "Vet",
+        "username_digits": 5
       },
       "google": {
         "client_id": "env:BET30_GOOGLE_CLIENT_ID",
