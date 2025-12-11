@@ -16,71 +16,6 @@ interface KommoCustomField {
 }
 
 /**
- * Envía mensaje directo al usuario via WhatsApp (usando canal integrado en KOMMO)
- */
-async function sendWhatsAppMessageToUser(
-  leadId: number,
-  username: string,
-  password: string,
-  config: ClientConfig
-): Promise<boolean> {
-  if (!config.kommo.access_token || !config.kommo.subdomain) {
-    console.warn('[KOMMO Create Player] KOMMO credentials not configured');
-    return false;
-  }
-
-  if (!config.kommo.whatsapp_scope_id) {
-    console.warn('[KOMMO Create Player] KOMMO_WHATSAPP_SCOPE_ID not configured');
-  }
-
-  const messageText = `🎰 ¡Cuenta creada exitosamente!
-
-Usuario: ${username}
-Contraseña: ${password}
-
-Podés iniciar sesión en: https://bet30.blog`;
-
-  try {
-    const payload: {
-      conversation_id: number;
-      scope_id?: string;
-      message: { text: string };
-    } = {
-      conversation_id: leadId,
-      message: { text: messageText },
-    };
-
-    if (config.kommo.whatsapp_scope_id) {
-      payload.scope_id = config.kommo.whatsapp_scope_id;
-    }
-
-    const response = await fetch(
-      `https://${config.kommo.subdomain}.kommo.com/api/v4/talks/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.kommo.access_token}`,
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[KOMMO Create Player] WhatsApp error:', { status: response.status, body: errorText });
-      return false;
-    }
-
-    console.log('[KOMMO Create Player] WhatsApp message sent successfully');
-    return true;
-  } catch (error) {
-    console.error('[KOMMO Create Player] WhatsApp error:', error);
-    return false;
-  }
-}
-
-/**
  * Envía una nota al lead en KOMMO con las credenciales
  */
 async function sendCredentialsToKommo(
@@ -431,13 +366,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Send WhatsApp message
-    const whatsappSent = await sendWhatsAppMessageToUser(leadId, username, password, config);
-
-    // Fallback to note if WhatsApp fails
-    if (!whatsappSent) {
-      await sendCredentialsToKommo(leadId, username, password, config);
-    }
+    // Send credentials as internal note in KOMMO
+    await sendCredentialsToKommo(leadId, username, password, config);
 
     return NextResponse.json({
       success: true,
@@ -448,7 +378,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       player_data: result,
       custom_fields_updated: customFieldsUpdated,
       google_contact_created: googleContactCreated,
-      whatsapp_sent: whatsappSent,
     });
 
   } catch (error) {
