@@ -267,7 +267,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Retry logic for residential proxy (different IP each attempt) and duplicate username
     const MAX_RETRIES = 5;
     const MAX_USERNAME_RETRIES = 3;
-    const RETRY_DELAY_MS = 10000; // 10 seconds between retries
+    const RETRY_DELAY_MS = 3000; // 3 seconds between retries
     let lastError: Error | null = null;
     let result: unknown = null;
     let usernameAttempts = 0;
