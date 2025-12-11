@@ -36,7 +36,7 @@
       },
       "backend": {
         "type": "bet30",
-        "api_url": "https://admin.bet30.store/api/services/app/Players/AddPlayer",
+        "api_url": "https://admin.bet30.blog/api/services/app/Players/AddPlayer",
         "api_token": "env:BET30_PLAYER_API_TOKEN",
         "skin_id": "1025c6bf14cd",
         "username_prefix": "vet",
