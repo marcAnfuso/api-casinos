@@ -408,14 +408,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         // Create player data with current username
-        // bet30 API expects: UserName, Password, Name, Surname, Phone, SkinId
         const playerData = {
-          UserName: username,
-          Password: password,
-          Name: name || username,  // Fallback to username if name not available
-          Surname: '',
-          Phone: phone || '',
-          SkinId: config.backend.skin_id,
+          userName: username,
+          password: password,
+          skinId: config.backend.skin_id,
+          agentId: null,
+          language: 'es',
         };
 
         const randomUserAgent = getRandomUserAgent();
