@@ -238,6 +238,26 @@ async function getCurrentLeadStatus(
 }
 
 /**
+ * Lista de User-Agents reales para rotar y evitar detección de WAF
+ */
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1',
+  'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36',
+  'Mozilla/5.0 (iPad; CPU OS 17_1_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Mobile/15E148 Safari/604.1',
+];
+
+function getRandomUserAgent(): string {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+/**
  * POST /api/[clientId]/create-player-from-kommo
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -395,11 +415,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           language: 'es',
         };
 
+        const randomUserAgent = getRandomUserAgent();
         const axiosConfig: AxiosRequestConfig = {
           headers: {
             'Content-Type': 'application/json-patch+json',
             'Authorization': `Bearer ${config.backend.api_token}`,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': randomUserAgent,
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
             'Origin': 'https://admin.bet30.store',
@@ -410,7 +431,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
         // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
         if (config.proxy) {
-          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy`);
+          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy with UA: ${randomUserAgent.substring(0, 50)}...`);
           const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
           const httpsAgent = new HttpsProxyAgent(proxyUrl, {
             rejectUnauthorized: false, // Skip cert validation through proxy tunnel
