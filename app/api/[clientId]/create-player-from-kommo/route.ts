@@ -199,10 +199,11 @@ function generateUsername(prefix: string = 'vet', digits: number = 4): string {
 }
 
 /**
- * Genera password simple
+ * Genera password: Pass + 5 dígitos random
  */
 function generatePassword(): string {
-  return 'Pass1234';
+  const randomDigits = Math.floor(10000 + Math.random() * 90000); // 5 dígitos (10000-99999)
+  return `Pass${randomDigits}`;
 }
 
 /**
