@@ -16,6 +16,79 @@ interface KommoCustomField {
 }
 
 /**
+ * Mueve el lead a un status específico en KOMMO
+ */
+async function moveLeadToStatus(
+  leadId: number,
+  statusId: number,
+  config: ClientConfig
+): Promise<boolean> {
+  if (!config.kommo.access_token || !config.kommo.subdomain) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+        body: JSON.stringify({
+          status_id: statusId,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.error('[KOMMO Create Player] Failed to move lead to status:', statusId);
+      return false;
+    }
+
+    console.log(`[KOMMO Create Player] Lead ${leadId} moved to status ${statusId}`);
+    return true;
+  } catch (error) {
+    console.error('[KOMMO Create Player] Error moving lead:', error);
+    return false;
+  }
+}
+
+/**
+ * Agrega una nota al lead en KOMMO
+ */
+async function addNoteToLead(
+  leadId: number,
+  noteText: string,
+  config: ClientConfig
+): Promise<void> {
+  if (!config.kommo.access_token || !config.kommo.subdomain) {
+    return;
+  }
+
+  try {
+    await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/notes`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+        body: JSON.stringify([{
+          entity_id: leadId,
+          note_type: 'common',
+          params: { text: noteText },
+        }]),
+      }
+    );
+  } catch (error) {
+    console.error('[KOMMO Create Player] Error adding note:', error);
+  }
+}
+
+/**
  * Envía una nota al lead en KOMMO con las credenciales
  */
 async function sendCredentialsToKommo(
@@ -351,6 +424,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     if (!result) {
+      // All retries failed - move to REINTENTO status if configured
+      if (config.kommo.reintento_status_id) {
+        console.log(`[${clientId}] All retries failed, moving lead ${leadId} to REINTENTO status`);
+        await moveLeadToStatus(leadId, config.kommo.reintento_status_id, config);
+        await addNoteToLead(
+          leadId,
+          `⚠️ Error al crear jugador - Reintentando automáticamente\n\nError: ${lastError?.message || 'Unknown error'}\nIntentos: ${MAX_RETRIES}`,
+          config
+        );
+
+        // Return success with retry flag - don't update credentials fields
+        return NextResponse.json({
+          success: false,
+          retry_scheduled: true,
+          message: 'Player creation failed, moved to retry queue',
+          client: clientId,
+          lead_id: leadId,
+          error: lastError?.message || 'All retry attempts failed',
+        });
+      }
+
+      // No retry status configured, throw error as before
       throw lastError || new Error('All retry attempts failed');
     }
 

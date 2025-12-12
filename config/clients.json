@@ -28,6 +28,7 @@
         "comprobante_recibido_status_id": 97211819,
         "comprobante_no_recibido_status_id": 97216287,
         "no_respondio_status_id": 90036483,
+        "reintento_status_id": 98016703,
         "transferido_status_id": 0,
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3,
