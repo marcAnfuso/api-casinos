@@ -206,6 +206,38 @@ function generatePassword(): string {
 }
 
 /**
+ * Obtiene el status actual del lead
+ */
+async function getCurrentLeadStatus(
+  leadId: number,
+  config: ClientConfig
+): Promise<number | null> {
+  if (!config.kommo.access_token || !config.kommo.subdomain) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const lead = await response.json();
+    return lead.status_id || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * POST /api/[clientId]/create-player-from-kommo
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -281,6 +313,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { success: false, error: 'Lead ID not found in payload' },
         { status: 400 }
       );
+    }
+
+    // Check if lead is already in REINTENTO (to detect retry loop)
+    const currentStatusId = await getCurrentLeadStatus(leadId, config);
+    const isAlreadyInReintento = currentStatusId === config.kommo.reintento_status_id;
+    if (isAlreadyInReintento) {
+      console.log(`[${clientId}] Lead ${leadId} is already in REINTENTO - this is a retry attempt`);
     }
 
     // Fetch missing data from KOMMO API
@@ -424,7 +463,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     if (!result) {
-      // All retries failed - move to REINTENTO status if configured
+      // All retries failed - check if this is a retry loop
+      if (isAlreadyInReintento && config.kommo.ayuda_manual_status_id) {
+        // Lead was already in REINTENTO and failed again → move to AYUDA MANUAL
+        console.log(`[${clientId}] Retry loop detected! Moving lead ${leadId} to AYUDA MANUAL`);
+        await moveLeadToStatus(leadId, config.kommo.ayuda_manual_status_id, config);
+        await addNoteToLead(
+          leadId,
+          `🚨 AYUDA MANUAL REQUERIDA\n\nEl lead falló múltiples veces al crear jugador.\nÚltimo error: ${lastError?.message || 'Unknown error'}\n\nRequiere intervención manual.`,
+          config
+        );
+
+        return NextResponse.json({
+          success: false,
+          needs_manual_help: true,
+          message: 'Retry loop detected, moved to manual help queue',
+          client: clientId,
+          lead_id: leadId,
+          error: lastError?.message || 'All retry attempts failed',
+        });
+      }
+
+      // First failure - move to REINTENTO status if configured
       if (config.kommo.reintento_status_id) {
         console.log(`[${clientId}] All retries failed, moving lead ${leadId} to REINTENTO status`);
         await moveLeadToStatus(leadId, config.kommo.reintento_status_id, config);
