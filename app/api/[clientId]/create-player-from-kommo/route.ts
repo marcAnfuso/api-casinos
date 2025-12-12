@@ -461,8 +461,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Send credentials as internal note in KOMMO
-    await sendCredentialsToKommo(leadId, username, password, config);
+    // Move lead to CREACION Y ENVIO USER status (Salesbot will send credentials)
+    let movedToCreacionEnvio = false;
+    if (config.kommo.creacion_envio_user_status_id) {
+      movedToCreacionEnvio = await moveLeadToStatus(leadId, config.kommo.creacion_envio_user_status_id, config);
+      console.log(`[${clientId}] Lead ${leadId} moved to CREACION Y ENVIO USER status`);
+    } else {
+      // Fallback: send credentials as internal note if status not configured
+      await sendCredentialsToKommo(leadId, username, password, config);
+    }
 
     return NextResponse.json({
       success: true,
@@ -472,6 +479,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       password,
       player_data: result,
       custom_fields_updated: customFieldsUpdated,
+      moved_to_creacion_envio: movedToCreacionEnvio,
       google_contact_created: googleContactCreated,
     });
 

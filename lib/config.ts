@@ -17,6 +17,7 @@ export interface KommoConfig {
   no_respondio_status_id?: number;
   transferido_status_id?: number;  // Status when deposit is confirmed (triggers Meta CAPI)
   reintento_status_id?: number;    // Status for failed player creation - triggers retry
+  creacion_envio_user_status_id?: number;  // Status after successful player creation - Salesbot sends credentials
   intentos_comprobante_field_id?: number;
   max_intentos_comprobante?: number;
   fbclid_field_id?: number;  // Custom field to store fbclid from [REF:xxx]
@@ -74,6 +75,7 @@ interface RawClientConfig {
     no_respondio_status_id?: number;
     transferido_status_id?: number;
     reintento_status_id?: number;
+    creacion_envio_user_status_id?: number;
     intentos_comprobante_field_id?: number;
     max_intentos_comprobante?: number;
     fbclid_field_id?: number;
@@ -154,6 +156,7 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       no_respondio_status_id: rawConfig.kommo.no_respondio_status_id,
       transferido_status_id: rawConfig.kommo.transferido_status_id,
       reintento_status_id: rawConfig.kommo.reintento_status_id,
+      creacion_envio_user_status_id: rawConfig.kommo.creacion_envio_user_status_id,
       intentos_comprobante_field_id: rawConfig.kommo.intentos_comprobante_field_id,
       max_intentos_comprobante: rawConfig.kommo.max_intentos_comprobante,
       fbclid_field_id: rawConfig.kommo.fbclid_field_id,
