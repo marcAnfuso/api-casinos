@@ -397,6 +397,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     console.log(`[${clientId}] Creating player:`, { username, name, phone });
 
+    // Random initial delay (0-5 seconds) to stagger concurrent requests
+    // This prevents multiple webhooks from hitting bet30 API simultaneously
+    const initialDelay = Math.floor(Math.random() * 5000);
+    console.log(`[${clientId}] Waiting ${initialDelay}ms before calling bet30 API...`);
+    await new Promise(resolve => setTimeout(resolve, initialDelay));
+
     // Retry logic for residential proxy (different IP each attempt) and duplicate username
     const MAX_RETRIES = 10;
     const MAX_USERNAME_RETRIES = 3;
