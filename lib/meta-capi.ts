@@ -167,9 +167,9 @@ export async function sendPurchaseEvent(
   }
 
   const event: ConversionEvent = {
-    event_name: 'Comprar' as ConversionEvent['event_name'],
+    event_name: 'Purchase',
     event_time: eventTime,
-    event_id: `comprar_${eventTime}_${Math.random().toString(36).substr(2, 9)}`,
+    event_id: `purchase_${eventTime}_${Math.random().toString(36).substr(2, 9)}`,
     action_source: 'website',
     user_data: userData,
     custom_data: {
