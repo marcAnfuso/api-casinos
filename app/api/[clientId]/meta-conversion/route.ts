@@ -198,9 +198,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Verify lead is in transferido status (if configured)
-    if (config.kommo.transferido_status_id && leadData.statusId !== config.kommo.transferido_status_id) {
-      console.log(`[${clientId}] Lead not in transferido status (current: ${leadData.statusId}, expected: ${config.kommo.transferido_status_id})`);
+    // Verify lead is in one of the transferido statuses (if configured)
+    const transferidoStatuses = config.kommo.transferido_status_ids || [];
+    if (transferidoStatuses.length > 0 && !transferidoStatuses.includes(leadData.statusId)) {
+      console.log(`[${clientId}] Lead not in transferido status (current: ${leadData.statusId}, expected one of: ${transferidoStatuses.join(', ')})`);
       return NextResponse.json({
         success: true,
         message: 'Lead not in transferido status - conversion not sent',
