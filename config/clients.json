@@ -62,8 +62,8 @@
         "test_event_code": ""
       }
     },
-    "zeus": {
-      "name": "Casino Zeus",
+    "zeus1": {
+      "name": "Casino Zeus Pipeline 1",
       "kommo": {
         "access_token": "env:ZEUS_KOMMO_ACCESS_TOKEN",
         "subdomain": "lucasleoneldiaz1",
@@ -76,6 +76,34 @@
         "reintento_status_id": 98993940,
         "ayuda_manual_status_id": 98992212,
         "creacion_envio_user_status_id": 98992352,
+        "transferido_status_ids": [],
+        "intentos_comprobante_field_id": 3497595,
+        "max_intentos_comprobante": 3,
+        "fbclid_field_id": 0,
+        "monto_field_id": 0
+      },
+      "backend": {
+        "type": "casinozeus",
+        "api_url": "https://admin.casinozeus1.vip/api/admin/",
+        "api_token": "env:ZEUS_API_TOKEN",
+        "username_prefix": "Ban",
+        "username_digits": 5
+      }
+    },
+    "zeus2": {
+      "name": "Casino Zeus Pipeline 2",
+      "kommo": {
+        "access_token": "env:ZEUS_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lucasleoneldiaz1",
+        "username_field_id": 3497591,
+        "password_field_id": 3497593,
+        "pipeline_id": 12826332,
+        "esperando_comprobante_status_id": 98995532,
+        "comprobante_recibido_status_id": 98995592,
+        "comprobante_no_recibido_status_id": 98995536,
+        "reintento_status_id": 98995540,
+        "ayuda_manual_status_id": 98995288,
+        "creacion_envio_user_status_id": 98995528,
         "transferido_status_ids": [],
         "intentos_comprobante_field_id": 3497595,
         "max_intentos_comprobante": 3,
