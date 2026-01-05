@@ -413,46 +413,73 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        // Create player data with current username
-        const playerData = {
-          userName: username,
-          password: password,
-          skinId: config.backend.skin_id,
-          agentId: null,
-          language: 'es',
-        };
-
         const randomUserAgent = getRandomUserAgent();
-        const axiosConfig: AxiosRequestConfig = {
-          headers: {
-            'Content-Type': 'application/json-patch+json',
-            'Authorization': `Bearer ${config.backend.api_token}`,
-            'User-Agent': randomUserAgent,
-            'Accept': 'application/json',
-            'Accept-Encoding': 'gzip, deflate, br, zstd',
-            'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-            'Origin': 'https://admin.bet30.blog',
-            'Referer': 'https://admin.bet30.blog/',
-            'Connection': 'keep-alive',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin',
-          },
-          timeout: 30000,
-        };
+        let response;
 
-        // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
-        if (config.proxy) {
-          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy with UA: ${randomUserAgent.substring(0, 50)}...`);
-          const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
-          const httpsAgent = new HttpsProxyAgent(proxyUrl, {
-            rejectUnauthorized: false, // Skip cert validation through proxy tunnel
-          });
-          axiosConfig.httpsAgent = httpsAgent;
-          axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
+        if (config.backend.type === 'casinozeus') {
+          // CasinoZeus API: Form Data with token in body
+          const formData = new URLSearchParams();
+          formData.append('action', 'CreateUser');
+          formData.append('token', config.backend.api_token);
+          formData.append('username', username);
+          formData.append('password', password);
+          formData.append('userrole', 'player');
+          formData.append('currency', 'ARS');
+
+          const axiosConfig: AxiosRequestConfig = {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': randomUserAgent,
+              'Accept': 'application/json',
+              'Origin': 'https://admin.casinozeus1.vip',
+              'Referer': 'https://admin.casinozeus1.vip/',
+            },
+            timeout: 30000,
+          };
+
+          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Calling CasinoZeus API...`);
+          response = await axios.post(config.backend.api_url, formData.toString(), axiosConfig);
+        } else {
+          // bet30 API: JSON body with Bearer token in header
+          const playerData = {
+            userName: username,
+            password: password,
+            skinId: config.backend.skin_id,
+            agentId: null,
+            language: 'es',
+          };
+
+          const axiosConfig: AxiosRequestConfig = {
+            headers: {
+              'Content-Type': 'application/json-patch+json',
+              'Authorization': `Bearer ${config.backend.api_token}`,
+              'User-Agent': randomUserAgent,
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip, deflate, br, zstd',
+              'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
+              'Origin': 'https://admin.bet30.blog',
+              'Referer': 'https://admin.bet30.blog/',
+              'Connection': 'keep-alive',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'same-origin',
+            },
+            timeout: 30000,
+          };
+
+          // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
+          if (config.proxy) {
+            console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy with UA: ${randomUserAgent.substring(0, 50)}...`);
+            const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
+            const httpsAgent = new HttpsProxyAgent(proxyUrl, {
+              rejectUnauthorized: false, // Skip cert validation through proxy tunnel
+            });
+            axiosConfig.httpsAgent = httpsAgent;
+            axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
+          }
+
+          response = await axios.post(config.backend.api_url, playerData, axiosConfig);
         }
-
-        const response = await axios.post(config.backend.api_url, playerData, axiosConfig);
 
         if (response.headers['content-type']?.includes('text/html')) {
           const htmlPreview = typeof response.data === 'string'
