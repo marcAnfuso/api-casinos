@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getClientConfig, ClientConfig } from '@/lib/config';
+import { getClientConfig, ClientConfig, findClientByPipelineId } from '@/lib/config';
 import { validatePaymentProof, ValidationResult } from '@/lib/vision-validator';
 import { extractFbclidFromMessage } from '@/lib/meta-capi';
 
@@ -10,6 +10,7 @@ interface RouteParams {
 interface LeadData {
   intentos: number;
   statusId: number;
+  pipelineId?: number;
 }
 
 interface LastMessage {
@@ -132,6 +133,7 @@ async function getLeadData(leadId: number, config: ClientConfig): Promise<LeadDa
     return {
       intentos,
       statusId: lead.status_id,
+      pipelineId: lead.pipeline_id,
     };
   } catch {
     return null;
@@ -326,15 +328,18 @@ async function handleNoProof(
  * Webhook que KOMMO dispara cuando llega un mensaje nuevo
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
-  const { clientId } = await params;
+  let { clientId } = await params;
 
-  const config = getClientConfig(clientId);
+  let config = getClientConfig(clientId);
   if (!config) {
     return NextResponse.json(
       { success: false, error: `Client '${clientId}' not found` },
       { status: 404 }
     );
   }
+
+  // Flag to track if we need to resolve pipeline for multi-pipeline clients like Zeus
+  const isMultiPipelineClient = clientId === 'zeus';
 
   try {
     const contentType = request.headers.get('content-type');
@@ -464,6 +469,47 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!leadId) {
       return NextResponse.json({ success: false, error: 'Could not extract lead/conversation ID' }, { status: 400 });
+    }
+
+    // For multi-pipeline clients (like Zeus), resolve the actual pipeline config
+    if (isMultiPipelineClient) {
+      console.log(`[${clientId}] Multi-pipeline client - fetching lead to detect pipeline...`);
+
+      // Fetch lead to get pipeline_id using the base config
+      const leadResponse = await fetch(
+        `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${config.kommo.access_token}`,
+          },
+        }
+      );
+
+      if (!leadResponse.ok) {
+        console.error(`[${clientId}] Failed to fetch lead for pipeline detection:`, leadResponse.status);
+        return NextResponse.json({ success: false, error: 'Could not fetch lead for pipeline detection' }, { status: 500 });
+      }
+
+      const leadData = await leadResponse.json();
+      const pipelineId = leadData.pipeline_id;
+
+      console.log(`[${clientId}] Lead ${leadId} is in pipeline: ${pipelineId}`);
+
+      // Find the client config that matches this pipeline
+      const pipelineConfig = findClientByPipelineId(pipelineId);
+      if (!pipelineConfig) {
+        console.log(`[${clientId}] No config found for pipeline ${pipelineId} - ignoring message`);
+        return NextResponse.json({
+          success: true,
+          message: `Pipeline ${pipelineId} not configured - message ignored`,
+          data: { leadId, pipelineId }
+        });
+      }
+
+      // Switch to the pipeline-specific config
+      clientId = pipelineConfig.clientId;
+      config = pipelineConfig.config;
+      console.log(`[${clientId}] Resolved to client config: ${clientId}`);
     }
 
     // Extract and save fbclid from message text [REF:xxx]

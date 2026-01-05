@@ -9,6 +9,7 @@ export interface KommoConfig {
   access_token: string;
   subdomain: string;
   whatsapp_scope_id?: string;
+  pipeline_id?: number;  // Pipeline ID for multi-pipeline clients like Zeus
   username_field_id?: number;  // Optional - only for player creation
   password_field_id?: number;  // Optional - only for player creation
   esperando_comprobante_status_id?: number;
@@ -68,6 +69,7 @@ interface RawClientConfig {
     access_token: string;
     subdomain: string;
     whatsapp_scope_id?: string;
+    pipeline_id?: number;
     username_field_id?: number;  // Optional - only for player creation
     password_field_id?: number;  // Optional - only for player creation
     esperando_comprobante_status_id?: number;
@@ -150,6 +152,7 @@ export function getClientConfig(clientId: string): ClientConfig | null {
       access_token: resolveEnvVar(rawConfig.kommo.access_token) || '',
       subdomain: rawConfig.kommo.subdomain,
       whatsapp_scope_id: resolveEnvVar(rawConfig.kommo.whatsapp_scope_id) || undefined,
+      pipeline_id: rawConfig.kommo.pipeline_id,
       username_field_id: rawConfig.kommo.username_field_id,
       password_field_id: rawConfig.kommo.password_field_id,
       esperando_comprobante_status_id: rawConfig.kommo.esperando_comprobante_status_id,
@@ -280,4 +283,21 @@ export function validateBackendConfig(config: ClientConfig): { valid: boolean; e
     valid: errors.length === 0,
     errors,
   };
+}
+
+/**
+ * Find client config by pipeline_id
+ * Used for multi-pipeline clients like Zeus where we need to detect the pipeline from the lead
+ */
+export function findClientByPipelineId(pipelineId: number): { clientId: string; config: ClientConfig } | null {
+  const clients = getAvailableClients();
+
+  for (const clientId of clients) {
+    const config = getClientConfig(clientId);
+    if (config && config.kommo.pipeline_id === pipelineId) {
+      return { clientId, config };
+    }
+  }
+
+  return null;
 }

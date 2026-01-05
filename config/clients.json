@@ -62,6 +62,13 @@
         "test_event_code": ""
       }
     },
+    "zeus": {
+      "name": "Casino Zeus (Base)",
+      "kommo": {
+        "access_token": "env:ZEUS_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lucasleoneldiaz1"
+      }
+    },
     "zeus1": {
       "name": "Casino Zeus Pipeline 1",
       "kommo": {
