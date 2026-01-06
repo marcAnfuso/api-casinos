@@ -403,7 +403,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.log(`[${clientId}] Waiting ${initialDelay}ms before calling bet30 API...`);
     await new Promise(resolve => setTimeout(resolve, initialDelay));
 
-    // Retry logic for residential proxy (different IP each attempt) and duplicate username
+    // Retry logic with Decodo sticky sessions
+    // Each attempt uses a NEW session ID = NEW IP from Decodo's pool
+    // This increases chances of finding an unblocked IP
     const MAX_RETRIES = 10;
     const MAX_USERNAME_RETRIES = 3;
     const RETRY_DELAY_MS = 2000; // 2 seconds between retries
@@ -411,82 +413,98 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     let result: unknown = null;
     let usernameAttempts = 0;
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const randomUserAgent = getRandomUserAgent();
-        let response;
+    // Helper to generate random session ID for Decodo sticky sessions
+    const generateSessionId = () => Math.random().toString(36).substring(2, 10);
 
-        if (config.backend.type === 'casinozeus') {
-          // CasinoZeus API: Form Data with token in body
-          const formData = new URLSearchParams();
-          formData.append('action', 'CreateUser');
-          formData.append('token', config.backend.api_token);
-          formData.append('username', username);
-          formData.append('password', password);
-          formData.append('userrole', 'player');
-          formData.append('currency', 'ARS');
+    // Helper function to make the API call
+    // Note: backend is guaranteed to exist at this point (validated above)
+    const backend = config.backend!;
+    const makeApiCall = async (attemptNum: number, sessionId: string) => {
+      const randomUserAgent = getRandomUserAgent();
 
-          const axiosConfig: AxiosRequestConfig = {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'User-Agent': randomUserAgent,
-              'Accept': 'application/json',
-              'Origin': 'https://admin.casinozeus1.vip',
-              'Referer': 'https://admin.casinozeus1.vip/',
-            },
-            timeout: 30000,
-          };
+      if (backend.type === 'casinozeus') {
+        // CasinoZeus API: Form Data with token in body
+        const formData = new URLSearchParams();
+        formData.append('action', 'CreateUser');
+        formData.append('token', backend.api_token);
+        formData.append('username', username);
+        formData.append('password', password);
+        formData.append('userrole', 'player');
+        formData.append('currency', 'ARS');
 
-          console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Calling CasinoZeus API...`);
-          response = await axios.post(config.backend.api_url, formData.toString(), axiosConfig);
+        const axiosConfig: AxiosRequestConfig = {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': randomUserAgent,
+            'Accept': 'application/json',
+            'Origin': 'https://admin.casinozeus1.vip',
+            'Referer': 'https://admin.casinozeus1.vip/',
+          },
+          timeout: 30000,
+        };
+
+        console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - Calling CasinoZeus API...`);
+        return axios.post(backend.api_url, formData.toString(), axiosConfig);
+      } else {
+        // bet30 API: JSON body with Bearer token in header
+        const playerData = {
+          userName: username,
+          password: password,
+          skinId: backend.skin_id,
+          agentId: null,
+          language: 'es',
+        };
+
+        const axiosConfig: AxiosRequestConfig = {
+          headers: {
+            'Content-Type': 'application/json-patch+json',
+            'Authorization': `Bearer ${backend.api_token}`,
+            'User-Agent': randomUserAgent,
+            'Accept': 'application/json',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
+            'Origin': 'https://admin.bet30.blog',
+            'Referer': 'https://admin.bet30.blog/',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+          },
+          timeout: 30000,
+        };
+
+        // Add proxy with sticky session (new session ID = new IP)
+        if (config.proxy) {
+          // Decodo sticky session format: username-session-XXXX
+          const proxyUsername = `${config.proxy.username}-session-${sessionId}`;
+          console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - Using PROXY session ${sessionId} with UA: ${randomUserAgent.substring(0, 50)}...`);
+          const proxyUrl = `http://${proxyUsername}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
+          const httpsAgent = new HttpsProxyAgent(proxyUrl, {
+            rejectUnauthorized: false, // Skip cert validation through proxy tunnel
+          });
+          axiosConfig.httpsAgent = httpsAgent;
+          axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
         } else {
-          // bet30 API: JSON body with Bearer token in header
-          const playerData = {
-            userName: username,
-            password: password,
-            skinId: config.backend.skin_id,
-            agentId: null,
-            language: 'es',
-          };
-
-          const axiosConfig: AxiosRequestConfig = {
-            headers: {
-              'Content-Type': 'application/json-patch+json',
-              'Authorization': `Bearer ${config.backend.api_token}`,
-              'User-Agent': randomUserAgent,
-              'Accept': 'application/json',
-              'Accept-Encoding': 'gzip, deflate, br, zstd',
-              'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-              'Origin': 'https://admin.bet30.blog',
-              'Referer': 'https://admin.bet30.blog/',
-              'Connection': 'keep-alive',
-              'Sec-Fetch-Dest': 'empty',
-              'Sec-Fetch-Mode': 'cors',
-              'Sec-Fetch-Site': 'same-origin',
-            },
-            timeout: 30000,
-          };
-
-          // Add proxy if configured (using HttpsProxyAgent to handle SSL through proxy)
-          if (config.proxy) {
-            console.log(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} - Using residential proxy with UA: ${randomUserAgent.substring(0, 50)}...`);
-            const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${config.proxy.port}`;
-            const httpsAgent = new HttpsProxyAgent(proxyUrl, {
-              rejectUnauthorized: false, // Skip cert validation through proxy tunnel
-            });
-            axiosConfig.httpsAgent = httpsAgent;
-            axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
-          }
-
-          response = await axios.post(config.backend.api_url, playerData, axiosConfig);
+          console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - NO PROXY configured, using direct connection`);
         }
+
+        return axios.post(backend.api_url, playerData, axiosConfig);
+      }
+    };
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      // Generate new session ID for each attempt = new IP from Decodo
+      const sessionId = generateSessionId();
+
+      try {
+        const response = await makeApiCall(attempt, sessionId);
 
         if (response.headers['content-type']?.includes('text/html')) {
           const htmlPreview = typeof response.data === 'string'
             ? response.data.substring(0, 500)
             : 'Unable to read HTML';
-          console.error(`[${clientId}] Attempt ${attempt} - Backend returned HTML:`, htmlPreview);
-          throw new Error('Backend returned HTML - IP might be blocked');
+          console.error(`[${clientId}] Attempt ${attempt} (session ${sessionId}) - Backend returned HTML (IP blocked):`, htmlPreview);
+          throw new Error(`Backend returned HTML - IP blocked (session ${sessionId})`);
         }
 
         if (response.status !== 200 && response.status !== 201) {
@@ -507,20 +525,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
 
         result = responseData;
-        console.log(`[${clientId}] Player created on attempt ${attempt}:`, result);
+        console.log(`[${clientId}] Player created on attempt ${attempt} (session ${sessionId}):`, result);
         break; // Success, exit retry loop
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} failed:`, lastError.message);
+        console.error(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} failed (session ${sessionId}):`, lastError.message);
 
         if (attempt < MAX_RETRIES) {
-          // Wait before retrying (new proxy IP)
-          console.log(`[${clientId}] Waiting ${RETRY_DELAY_MS / 1000}s before retry...`);
+          // Wait before retrying with new session/IP
+          console.log(`[${clientId}] Waiting ${RETRY_DELAY_MS / 1000}s before retry with new IP...`);
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
         }
       }
     }
+
+    const totalAttempts = MAX_RETRIES; // For error message below
 
     if (!result) {
       // All retries failed - check if this is a retry loop
@@ -550,7 +570,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         await moveLeadToStatus(leadId, config.kommo.reintento_status_id, config);
         await addNoteToLead(
           leadId,
-          `⚠️ Error al crear jugador - Reintentando automáticamente\n\nError: ${lastError?.message || 'Unknown error'}\nIntentos: ${MAX_RETRIES}`,
+          `⚠️ Error al crear jugador - Reintentando automáticamente\n\nError: ${lastError?.message || 'Unknown error'}\nIntentos: ${totalAttempts}`,
           config
         );
 
