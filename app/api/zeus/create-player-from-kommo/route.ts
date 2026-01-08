@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios, { AxiosRequestConfig } from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
-import { getClientConfig, validateClientConfig, ClientConfig } from '@/lib/config';
+import { getClientConfig, validateClientConfig, ClientConfig, findClientByPipelineId } from '@/lib/config';
 import { createGoogleContact } from '@/lib/google-contacts';
-
-interface RouteParams {
-  params: Promise<{ clientId: string }>;
-}
 
 interface KommoCustomField {
   field_id: number;
@@ -107,7 +103,7 @@ async function sendCredentialsToKommo(
 Usuario: ${username}
 Contraseña: ${password}
 
-Podés iniciar sesión en: https://bet30.blog`;
+Podés iniciar sesión en: https://casinozeus1.vip`;
 
   try {
     await fetch(
@@ -259,34 +255,18 @@ function getRandomUserAgent(): string {
 }
 
 /**
- * POST /api/[clientId]/create-player-from-kommo
+ * POST /api/zeus/create-player-from-kommo
+ * Multi-pipeline auto-detection endpoint for Casino Zeus
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  const { clientId } = await params;
+export async function POST(request: NextRequest) {
+  let clientId = 'zeus';
 
-  // Get client configuration
-  const config = getClientConfig(clientId);
+  // Get base zeus configuration (for KOMMO access)
+  let config = getClientConfig(clientId);
   if (!config) {
     return NextResponse.json(
       { success: false, error: `Client '${clientId}' not found` },
       { status: 404 }
-    );
-  }
-
-  // Validate configuration
-  const validation = validateClientConfig(config);
-  if (!validation.valid) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid configuration', details: validation.errors },
-      { status: 500 }
-    );
-  }
-
-  // This endpoint requires backend config for player creation
-  if (!config.backend) {
-    return NextResponse.json(
-      { success: false, error: 'Backend not configured for this client' },
-      { status: 400 }
     );
   }
 
@@ -308,16 +288,88 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     console.log(`[${clientId}] Payload:`, JSON.stringify(payload, null, 2));
 
-    // Extract data from webhook
+    // Extract lead ID from webhook
     let leadId: number | null = null;
+    for (const [key, value] of Object.entries(payload)) {
+      if (key.includes('leads[') && key.includes('[id]')) {
+        leadId = parseInt(value as string);
+        break;
+      }
+    }
+
+    if (!leadId) {
+      return NextResponse.json(
+        { success: false, error: 'Lead ID not found in payload' },
+        { status: 400 }
+      );
+    }
+
+    // AUTO-DETECT PIPELINE: Fetch lead to get pipeline_id
+    console.log(`[${clientId}] Multi-pipeline client - fetching lead ${leadId} to detect pipeline...`);
+    const leadResponse = await fetch(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+      }
+    );
+
+    if (!leadResponse.ok) {
+      console.error(`[${clientId}] Failed to fetch lead for pipeline detection:`, leadResponse.status);
+      return NextResponse.json(
+        { success: false, error: 'Could not fetch lead for pipeline detection' },
+        { status: 500 }
+      );
+    }
+
+    const leadData = await leadResponse.json();
+    const pipelineId = leadData.pipeline_id;
+
+    console.log(`[${clientId}] Lead ${leadId} is in pipeline: ${pipelineId}`);
+
+    // Find the client config that matches this pipeline (zeus1, zeus2, or zeus3)
+    const pipelineConfig = findClientByPipelineId(pipelineId);
+    if (!pipelineConfig) {
+      console.log(`[${clientId}] No config found for pipeline ${pipelineId} - cannot create player`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Pipeline ${pipelineId} not configured`,
+          message: `No configuration found for pipeline ${pipelineId}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Switch to the pipeline-specific config (zeus1, zeus2, or zeus3)
+    clientId = pipelineConfig.clientId;
+    config = pipelineConfig.config;
+    console.log(`[${clientId}] Resolved to client config: ${clientId} (pipeline ${pipelineId})`);
+
+    // Validate configuration
+    const validation = validateClientConfig(config);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid configuration', details: validation.errors },
+        { status: 500 }
+      );
+    }
+
+    // This endpoint requires backend config for player creation
+    if (!config.backend) {
+      return NextResponse.json(
+        { success: false, error: 'Backend not configured for this client' },
+        { status: 400 }
+      );
+    }
+
+    // Extract contact data from webhook or fetch from KOMMO
     let email: string | null = null;
     let name: string | null = null;
     let phone: string | null = null;
 
     for (const [key, value] of Object.entries(payload)) {
-      if (key.includes('leads[') && key.includes('[id]')) {
-        leadId = parseInt(value as string);
-      }
       if (key.toLowerCase().includes('email')) {
         email = value as string;
       }
@@ -329,31 +381,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    if (!leadId) {
-      return NextResponse.json(
-        { success: false, error: 'Lead ID not found in payload' },
-        { status: 400 }
-      );
-    }
-
-    // Check if lead is already in REINTENTO (to detect retry loop)
-    const currentStatusId = await getCurrentLeadStatus(leadId, config);
-    const isAlreadyInReintento = currentStatusId === config.kommo.reintento_status_id;
-    if (isAlreadyInReintento) {
-      console.log(`[${clientId}] Lead ${leadId} is already in REINTENTO - this is a retry attempt`);
-    }
-
     // Fetch missing data from KOMMO API
     if (!email || !phone || !name) {
       try {
-        const leadResponse = await fetch(
+        const leadWithContactsResponse = await fetch(
           `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}?with=contacts`,
           { headers: { 'Authorization': `Bearer ${config.kommo.access_token}` } }
         );
 
-        if (leadResponse.ok) {
-          const leadData = await leadResponse.json();
-          const contactId = leadData._embedded?.contacts?.[0]?.id;
+        if (leadWithContactsResponse.ok) {
+          const leadWithContactsData = await leadWithContactsResponse.json();
+          const contactId = leadWithContactsData._embedded?.contacts?.[0]?.id;
 
           if (contactId) {
             const contactResponse = await fetch(
@@ -397,111 +435,52 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     console.log(`[${clientId}] Creating player:`, { username, name, phone });
 
-    // Random initial delay (0-10 seconds) to stagger concurrent requests
-    // This prevents multiple webhooks from hitting bet30 API simultaneously
-    const initialDelay = Math.floor(Math.random() * 10000);
-    console.log(`[${clientId}] Waiting ${initialDelay}ms before calling bet30 API...`);
-    await new Promise(resolve => setTimeout(resolve, initialDelay));
+    // Check if lead is already in REINTENTO (to detect retry loop)
+    const currentStatusId = await getCurrentLeadStatus(leadId, config);
+    const isAlreadyInReintento = currentStatusId === config.kommo.reintento_status_id;
+    if (isAlreadyInReintento) {
+      console.log(`[${clientId}] Lead ${leadId} is already in REINTENTO - this is a retry attempt`);
+    }
 
-    // Retry logic with Decodo proxy - different ports = different IPs
-    // Decodo uses ports 10001-10010 for different sticky sessions (10min each)
-    const MAX_RETRIES = 10;
+    // Retry logic for CasinoZeus API
+    const MAX_RETRIES = 3;
     const MAX_USERNAME_RETRIES = 3;
-    const RETRY_DELAY_MS = 2000; // 2 seconds between retries
-    const DECODO_BASE_PORT = 10001; // Ports 10001-10010 give different IPs
+    const RETRY_DELAY_MS = 2000;
     let lastError: Error | null = null;
     let result: unknown = null;
     let usernameAttempts = 0;
 
-    // Helper function to make the API call
-    // Note: backend is guaranteed to exist at this point (validated above)
     const backend = config.backend!;
-    const makeApiCall = async (attemptNum: number, proxyPort: number) => {
+    const makeApiCall = async (attemptNum: number) => {
       const randomUserAgent = getRandomUserAgent();
 
-      if (backend.type === 'casinozeus') {
-        // CasinoZeus API: Form Data with token in body
-        const formData = new URLSearchParams();
-        formData.append('action', 'CreateUser');
-        formData.append('token', backend.api_token);
-        formData.append('username', username);
-        formData.append('password', password);
-        formData.append('userrole', 'player');
-        formData.append('currency', 'ARS');
+      // CasinoZeus API: Form Data with token in body
+      const formData = new URLSearchParams();
+      formData.append('action', 'CreateUser');
+      formData.append('token', backend.api_token);
+      formData.append('username', username);
+      formData.append('password', password);
+      formData.append('userrole', 'player');
+      formData.append('currency', 'ARS');
 
-        const axiosConfig: AxiosRequestConfig = {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': randomUserAgent,
-            'Accept': 'application/json',
-            'Origin': 'https://admin.casinozeus1.vip',
-            'Referer': 'https://admin.casinozeus1.vip/',
-          },
-          timeout: 30000,
-        };
+      const axiosConfig: AxiosRequestConfig = {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': randomUserAgent,
+          'Accept': 'application/json',
+          'Origin': 'https://admin.casinozeus1.vip',
+          'Referer': 'https://admin.casinozeus1.vip/',
+        },
+        timeout: 30000,
+      };
 
-        console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - Calling CasinoZeus API...`);
-        return axios.post(backend.api_url, formData.toString(), axiosConfig);
-      } else {
-        // bet30 API: JSON body with Bearer token in header
-        const playerData = {
-          userName: username,
-          password: password,
-          skinId: backend.skin_id,
-          agentId: null,
-          language: 'es',
-        };
-
-        const axiosConfig: AxiosRequestConfig = {
-          headers: {
-            'Content-Type': 'application/json-patch+json',
-            'Authorization': `Bearer ${backend.api_token}`,
-            'User-Agent': randomUserAgent,
-            'Accept': 'application/json',
-            'Accept-Encoding': 'gzip, deflate, br, zstd',
-            'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-            'Origin': 'https://admin.bet30.blog',
-            'Referer': 'https://admin.bet30.blog/',
-            'Connection': 'keep-alive',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin',
-          },
-          timeout: 30000,
-        };
-
-        // Add proxy - Decodo uses different ports for different IPs
-        if (config.proxy) {
-          console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - Using PROXY port ${proxyPort} with UA: ${randomUserAgent.substring(0, 50)}...`);
-          const proxyUrl = `http://${config.proxy.username}:${config.proxy.password}@${config.proxy.host}:${proxyPort}`;
-          const httpsAgent = new HttpsProxyAgent(proxyUrl, {
-            rejectUnauthorized: false, // Skip cert validation through proxy tunnel
-          });
-          axiosConfig.httpsAgent = httpsAgent;
-          axiosConfig.proxy = false; // Disable axios built-in proxy, use agent instead
-        } else {
-          console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - NO PROXY configured, using direct connection`);
-        }
-
-        return axios.post(backend.api_url, playerData, axiosConfig);
-      }
+      console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - Calling CasinoZeus API...`);
+      return axios.post(backend.api_url, formData.toString(), axiosConfig);
     };
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      // Use different port for each attempt = different IP from Decodo
-      // Ports cycle: 10001, 10002, ..., 10010, then back to 10001
-      const proxyPort = DECODO_BASE_PORT + ((attempt - 1) % 10);
-
       try {
-        const response = await makeApiCall(attempt, proxyPort);
-
-        if (response.headers['content-type']?.includes('text/html')) {
-          const htmlPreview = typeof response.data === 'string'
-            ? response.data.substring(0, 500)
-            : 'Unable to read HTML';
-          console.error(`[${clientId}] Attempt ${attempt} (port ${proxyPort}) - Backend returned HTML (IP blocked):`, htmlPreview);
-          throw new Error(`Backend returned HTML - IP blocked (port ${proxyPort})`);
-        }
+        const response = await makeApiCall(attempt);
 
         if (response.status !== 200 && response.status !== 201) {
           throw new Error(`Backend error: ${response.status}`);
@@ -521,22 +500,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
 
         result = responseData;
-        console.log(`[${clientId}] Player created on attempt ${attempt} (port ${proxyPort}):`, result);
+        console.log(`[${clientId}] Player created on attempt ${attempt}:`, result);
         break; // Success, exit retry loop
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} failed (port ${proxyPort}):`, lastError.message);
+        console.error(`[${clientId}] Attempt ${attempt}/${MAX_RETRIES} failed:`, lastError.message);
 
         if (attempt < MAX_RETRIES) {
-          // Wait before retrying with different port/IP
-          console.log(`[${clientId}] Waiting ${RETRY_DELAY_MS / 1000}s before retry with different IP...`);
+          console.log(`[${clientId}] Waiting ${RETRY_DELAY_MS / 1000}s before retry...`);
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
         }
       }
     }
-
-    const totalAttempts = MAX_RETRIES; // For error message below
 
     if (!result) {
       // All retries failed - check if this is a retry loop
@@ -566,11 +542,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         await moveLeadToStatus(leadId, config.kommo.reintento_status_id, config);
         await addNoteToLead(
           leadId,
-          `⚠️ Error al crear jugador - Reintentando automáticamente\n\nError: ${lastError?.message || 'Unknown error'}\nIntentos: ${totalAttempts}`,
+          `⚠️ Error al crear jugador - Reintentando automáticamente\n\nError: ${lastError?.message || 'Unknown error'}\nIntentos: ${MAX_RETRIES}`,
           config
         );
 
-        // Return success with retry flag - don't update credentials fields
         return NextResponse.json({
           success: false,
           retry_scheduled: true,
@@ -581,7 +556,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         });
       }
 
-      // No retry status configured, throw error as before
+      // No retry status configured, throw error
       throw lastError || new Error('All retry attempts failed');
     }
 
@@ -611,6 +586,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       success: true,
       message: 'Player created successfully',
       client: clientId,
+      pipeline_id: pipelineId,
       username,
       password,
       player_data: result,
@@ -629,17 +605,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 /**
- * GET /api/[clientId]/create-player-from-kommo - Health check
+ * GET /api/zeus/create-player-from-kommo - Health check
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { clientId } = await params;
-  const config = getClientConfig(clientId);
+export async function GET() {
+  const config = getClientConfig('zeus');
 
   return NextResponse.json({
     status: config ? 'ok' : 'error',
-    client: clientId,
+    client: 'zeus',
+    mode: 'multi-pipeline-auto-detect',
     configured: !!config,
-    message: config ? 'Ready to receive webhooks' : `Client '${clientId}' not found`,
+    message: config
+      ? 'Ready to receive webhooks (auto-detects pipeline: zeus1/zeus2/zeus3)'
+      : `Client 'zeus' not found`,
     timestamp: new Date().toISOString(),
   });
 }

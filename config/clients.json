@@ -95,6 +95,11 @@
         "api_token": "env:ZEUS_API_TOKEN",
         "username_prefix": "Ban",
         "username_digits": 5
+      },
+      "google": {
+        "client_id": "env:ZEUS1_GOOGLE_CLIENT_ID",
+        "client_secret": "env:ZEUS1_GOOGLE_CLIENT_SECRET",
+        "refresh_token": "env:ZEUS1_GOOGLE_REFRESH_TOKEN"
       }
     },
     "zeus2": {
@@ -123,6 +128,11 @@
         "api_token": "env:ZEUS_API_TOKEN",
         "username_prefix": "Ban",
         "username_digits": 5
+      },
+      "google": {
+        "client_id": "env:ZEUS2_GOOGLE_CLIENT_ID",
+        "client_secret": "env:ZEUS2_GOOGLE_CLIENT_SECRET",
+        "refresh_token": "env:ZEUS2_GOOGLE_REFRESH_TOKEN"
       }
     },
     "zeus3": {
@@ -151,6 +161,11 @@
         "api_token": "env:ZEUS_API_TOKEN",
         "username_prefix": "Ban",
         "username_digits": 5
+      },
+      "google": {
+        "client_id": "env:ZEUS3_GOOGLE_CLIENT_ID",
+        "client_secret": "env:ZEUS3_GOOGLE_CLIENT_SECRET",
+        "refresh_token": "env:ZEUS3_GOOGLE_REFRESH_TOKEN"
       }
     }
   }
