@@ -467,10 +467,7 @@ export async function POST(request: NextRequest) {
       const axiosConfig: AxiosRequestConfig = {
         headers: {
           ...formData.getHeaders(),
-          'User-Agent': randomUserAgent,
           'Accept': 'application/json',
-          'Origin': 'https://admin.casinozeus1.vip',
-          'Referer': 'https://admin.casinozeus1.vip/',
         },
         timeout: 30000,
       };
