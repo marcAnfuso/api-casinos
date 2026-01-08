@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios, { AxiosRequestConfig } from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import FormData from 'form-data';
 import { getClientConfig, validateClientConfig, ClientConfig, findClientByPipelineId } from '@/lib/config';
 import { createGoogleContact } from '@/lib/google-contacts';
 
@@ -454,8 +455,8 @@ export async function POST(request: NextRequest) {
     const makeApiCall = async (attemptNum: number) => {
       const randomUserAgent = getRandomUserAgent();
 
-      // CasinoZeus API: Form Data with token in body
-      const formData = new URLSearchParams();
+      // CasinoZeus API: Multipart Form Data with token in body
+      const formData = new FormData();
       formData.append('action', 'CreateUser');
       formData.append('token', backend.api_token);
       formData.append('username', username);
@@ -465,7 +466,7 @@ export async function POST(request: NextRequest) {
 
       const axiosConfig: AxiosRequestConfig = {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          ...formData.getHeaders(),
           'User-Agent': randomUserAgent,
           'Accept': 'application/json',
           'Origin': 'https://admin.casinozeus1.vip',
@@ -475,7 +476,7 @@ export async function POST(request: NextRequest) {
       };
 
       console.log(`[${clientId}] Attempt ${attemptNum}/${MAX_RETRIES} - Calling CasinoZeus API...`);
-      return axios.post(backend.api_url, formData.toString(), axiosConfig);
+      return axios.post(backend.api_url, formData, axiosConfig);
     };
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
