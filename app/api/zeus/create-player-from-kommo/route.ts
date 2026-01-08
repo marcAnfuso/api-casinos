@@ -489,6 +489,12 @@ export async function POST(request: NextRequest) {
 
         // Check if response indicates duplicate username error
         const responseData = response.data;
+
+        // Detect HTML response (backend returned error page instead of JSON)
+        if (typeof responseData === 'string' && (responseData.trim().startsWith('<!doctype') || responseData.trim().startsWith('<html'))) {
+          throw new Error('Backend returned HTML instead of JSON - possible authentication error');
+        }
+
         if (responseData?.result === 'ERROR' || responseData?.success === false) {
           usernameAttempts++;
           if (usernameAttempts < MAX_USERNAME_RETRIES) {
