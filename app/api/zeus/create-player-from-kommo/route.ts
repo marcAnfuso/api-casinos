@@ -10,46 +10,6 @@ interface KommoCustomField {
 }
 
 /**
- * Mueve el lead a un status específico en KOMMO
- */
-async function moveLeadToStatus(
-  leadId: number,
-  statusId: number,
-  config: ClientConfig
-): Promise<boolean> {
-  if (!config.kommo.access_token || !config.kommo.subdomain) {
-    return false;
-  }
-
-  try {
-    const response = await fetch(
-      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.kommo.access_token}`,
-        },
-        body: JSON.stringify({
-          status_id: statusId,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      console.error('[Zeus Save Contact] Failed to move lead to status:', statusId);
-      return false;
-    }
-
-    console.log(`[Zeus Save Contact] Lead ${leadId} moved to status ${statusId}`);
-    return true;
-  } catch (error) {
-    console.error('[Zeus Save Contact] Error moving lead:', error);
-    return false;
-  }
-}
-
-/**
  * Agrega una nota al lead en KOMMO
  */
 async function addNoteToLead(
@@ -263,19 +223,7 @@ export async function POST(request: NextRequest) {
       console.log(`[${clientId}] Phone not found, skipping Google Contact creation`);
     }
 
-    // Move lead to CREACION Y ENVIO USER status
-    let movedToNextStatus = false;
-    if (config.kommo.creacion_envio_user_status_id) {
-      movedToNextStatus = await moveLeadToStatus(leadId, config.kommo.creacion_envio_user_status_id, config);
-      console.log(`[${clientId}] Lead ${leadId} moved to CREACION Y ENVIO USER status`);
-    }
-
-    // Add success note
-    await addNoteToLead(
-      leadId,
-      `✅ Contacto guardado en Google\n\nUsuario: ${username}\nTeléfono: ${phone || 'N/A'}\nGoogle Contact: ${googleContactCreated ? 'Creado' : 'No creado'}`,
-      config
-    );
+    // NO movemos el lead - eso lo hace el Salesbot
 
     return NextResponse.json({
       success: true,
@@ -285,7 +233,6 @@ export async function POST(request: NextRequest) {
       username,
       phone,
       google_contact_created: googleContactCreated,
-      moved_to_next_status: movedToNextStatus,
     });
 
   } catch (error) {
