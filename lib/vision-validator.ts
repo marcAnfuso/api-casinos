@@ -1,11 +1,11 @@
 /**
- * AI Vision Validator using Google Gemini
+ * AI Vision Validator using OpenAI GPT-4o-mini
  * Validates if an image is a payment receipt/proof
  */
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 3000;
+const RETRY_DELAY_MS = 2000;
 
 export interface ValidationResult {
   isPaymentProof: boolean;
@@ -39,15 +39,17 @@ async function imageUrlToBase64(imageUrl: string): Promise<{ base64: string; mim
 }
 
 /**
- * Validates if an image is a payment proof using Gemini Vision
+ * Validates if an image is a payment proof using OpenAI Vision
  */
 export async function validatePaymentProof(
   imageUrl: string,
-  geminiApiKey: string | undefined
+  fileName: string
 ): Promise<ValidationResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+
   // If no API key, skip validation and assume it's valid
-  if (!geminiApiKey) {
-    console.warn('[Vision] GEMINI_API_KEY not configured, skipping validation');
+  if (!apiKey) {
+    console.warn('[Vision] OPENAI_API_KEY not configured, skipping validation');
     return {
       isPaymentProof: true,
       confidence: 'low',
@@ -90,37 +92,38 @@ NO es comprobante de pago:
   // Retry loop
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[Vision] Attempt ${attempt}/${MAX_RETRIES}...`);
+      console.log(`[Vision] Attempt ${attempt}/${MAX_RETRIES} - Analyzing image: ${fileName}`);
 
-      const response = await fetch(`${GEMINI_API_URL}?key=${geminiApiKey}`, {
+      const response = await fetch(OPENAI_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          contents: [
+          model: 'gpt-4o-mini',
+          messages: [
             {
-              parts: [
-                { text: prompt },
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
                 {
-                  inline_data: {
-                    mime_type: imageData.mimeType,
-                    data: imageData.base64,
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${imageData.mimeType};base64,${imageData.base64}`,
                   },
                 },
               ],
             },
           ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 256,
-          },
+          max_tokens: 256,
+          temperature: 0.1,
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Vision] Gemini API error (attempt ${attempt}):`, response.status, errorText);
+        console.error(`[Vision] OpenAI API error (attempt ${attempt}):`, response.status, errorText);
 
         // If not last attempt, wait and retry
         if (attempt < MAX_RETRIES) {
@@ -138,7 +141,7 @@ NO es comprobante de pago:
       }
 
       const data = await response.json();
-      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const textResponse = data.choices?.[0]?.message?.content;
 
       if (!textResponse) {
         if (attempt < MAX_RETRIES) {

@@ -569,8 +569,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Validate with AI Vision (only for images)
     let aiValidation: ValidationResult = { isPaymentProof: true, confidence: 'low', reason: 'Skipped' };
     if (attachmentType === 'image' && fileUrl) {
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      aiValidation = await validatePaymentProof(fileUrl, geminiApiKey);
+      aiValidation = await validatePaymentProof(fileUrl, fileName);
 
       console.log(`[${clientId}] AI Validation:`, aiValidation);
 
