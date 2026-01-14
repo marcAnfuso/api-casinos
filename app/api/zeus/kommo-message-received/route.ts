@@ -445,13 +445,18 @@ export async function POST(request: NextRequest) {
 
     console.log(`[${clientId}] Lead data:`, { statusId: leadData.statusId, intentos: leadData.intentos });
 
-    // Only process if lead is waiting for payment proof
-    if (leadData.statusId !== config.kommo.esperando_comprobante_status_id) {
-      console.log(`[${clientId}] Lead not in ESPERANDO_COMPROBANTE status (current: ${leadData.statusId}), skipping`);
+    // Only process if lead is waiting for payment proof (ESPERANDO or NO_RECIBIDO for retries)
+    const validStatuses = [
+      config.kommo.esperando_comprobante_status_id,
+      config.kommo.comprobante_no_recibido_status_id
+    ].filter(Boolean);
+
+    if (!validStatuses.includes(leadData.statusId)) {
+      console.log(`[${clientId}] Lead not in valid status for proof (current: ${leadData.statusId}, valid: ${validStatuses.join(', ')}), skipping`);
       return NextResponse.json({
         success: true,
         message: 'Lead not in waiting status',
-        data: { leadId, statusId: leadData.statusId }
+        data: { leadId, statusId: leadData.statusId, validStatuses }
       });
     }
 
