@@ -460,10 +460,41 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check if has attachment
+    // Check if has attachment - if not, treat as invalid attempt
     if (!attachmentType && !fileUrl) {
-      console.log(`[${clientId}] No attachment in message, ignoring`);
-      return NextResponse.json({ success: true, message: 'No attachment found' });
+      console.log(`[${clientId}] No attachment in message - treating as invalid attempt`);
+
+      // Update intentos counter
+      const newIntentos = leadData.intentos + 1;
+      await updateIntentosComprobante(leadId, newIntentos, config);
+
+      // Check if exceeded max attempts
+      const maxIntentos = config.kommo.max_intentos_comprobante || 3;
+      if (newIntentos >= maxIntentos) {
+        console.log(`[${clientId}] Max intentos reached (${newIntentos}/${maxIntentos}), moving to NO_RESPONDIO`);
+
+        if (config.kommo.no_respondio_status_id) {
+          await moveLeadToStatus(leadId, config.kommo.no_respondio_status_id, config);
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: 'Max attempts reached (no attachment) - moved to NO_RESPONDIO',
+          data: { leadId, intentos: newIntentos, maxIntentos }
+        });
+      } else {
+        console.log(`[${clientId}] No attachment - moving to COMPROBANTE_NO_RECIBIDO (intento ${newIntentos}/${maxIntentos})`);
+
+        if (config.kommo.comprobante_no_recibido_status_id) {
+          await moveLeadToStatus(leadId, config.kommo.comprobante_no_recibido_status_id, config);
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: 'No attachment - retry requested',
+          data: { leadId, intentos: newIntentos, maxIntentos, reason: 'No image attached' }
+        });
+      }
     }
 
     console.log(`[${clientId}] Processing attachment: ${fileName} (${attachmentType})`);
