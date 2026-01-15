@@ -149,31 +149,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get Username from lead custom fields
-    let username: string | null = null;
-    const customFields = leadData.custom_fields_values || [];
+    // Get lead name (e.g., "ban0020")
+    const leadName = leadData.name;
 
-    if (config?.kommo.username_field_id) {
-      const usernameField = customFields.find(
-        (f: KommoCustomField) => f.field_id === config!.kommo.username_field_id
-      );
-      username = usernameField?.values?.[0]?.value || null;
-    }
-
-    if (!username) {
-      console.error(`[${clientId}] Username not found in lead custom fields`);
+    if (!leadName) {
+      console.error(`[${clientId}] Lead name not found`);
       await addNoteToLead(
         leadId,
-        `⚠️ Error: No se encontró el campo Username en el lead.\nVerificá que el campo esté configurado correctamente.`,
+        `⚠️ Error: No se encontró el nombre del lead.`,
         config
       );
       return NextResponse.json(
-        { success: false, error: 'Username not found in lead' },
+        { success: false, error: 'Lead name not found' },
         { status: 400 }
       );
     }
 
-    console.log(`[${clientId}] Username from lead: ${username}`);
+    console.log(`[${clientId}] Lead name: ${leadName}`);
 
     // Get phone from contact
     let phone: string | null = null;
@@ -201,14 +193,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[${clientId}] Contact data:`, { username, phone, email });
+    console.log(`[${clientId}] Contact data:`, { leadName, phone, email });
 
-    // Create Google Contact (using username as contact name)
+    // Create Google Contact (using leadName as contact name)
     let googleContactCreated = false;
     if (config.google && phone) {
       console.log(`[${clientId}] Creating Google Contact...`);
       googleContactCreated = await createGoogleContact(
-        { name: username, phone, email: email || undefined },
+        { name: leadName, phone, email: email || undefined },
         config.google
       );
 
@@ -230,7 +222,7 @@ export async function POST(request: NextRequest) {
       message: 'Contact saved to Google successfully',
       client: clientId,
       pipeline_id: pipelineId,
-      username,
+      leadName,
       phone,
       google_contact_created: googleContactCreated,
     });
