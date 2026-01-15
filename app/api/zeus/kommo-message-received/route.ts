@@ -471,15 +471,15 @@ export async function POST(request: NextRequest) {
       // Check if exceeded max attempts
       const maxIntentos = config.kommo.max_intentos_comprobante || 3;
       if (newIntentos >= maxIntentos) {
-        console.log(`[${clientId}] Max intentos reached (${newIntentos}/${maxIntentos}), moving to NO_RESPONDIO`);
+        console.log(`[${clientId}] Max intentos reached (${newIntentos}/${maxIntentos}), moving to AYUDA_MANUAL`);
 
-        if (config.kommo.no_respondio_status_id) {
-          await moveLeadToStatus(leadId, config.kommo.no_respondio_status_id, config);
+        if (config.kommo.ayuda_manual_status_id) {
+          await moveLeadToStatus(leadId, config.kommo.ayuda_manual_status_id, config);
         }
 
         return NextResponse.json({
           success: true,
-          message: 'Max attempts reached (no attachment) - moved to NO_RESPONDIO',
+          message: 'Max attempts reached (no attachment) - moved to AYUDA_MANUAL',
           data: { leadId, intentos: newIntentos, maxIntentos }
         });
       } else {
@@ -538,15 +538,15 @@ export async function POST(request: NextRequest) {
       // Check if exceeded max attempts
       const maxIntentos = config.kommo.max_intentos_comprobante || 3;
       if (newIntentos >= maxIntentos) {
-        console.log(`[${clientId}] Max intentos reached (${newIntentos}/${maxIntentos}), moving to NO_RESPONDIO`);
+        console.log(`[${clientId}] Max intentos reached (${newIntentos}/${maxIntentos}), moving to AYUDA_MANUAL`);
 
-        if (config.kommo.no_respondio_status_id) {
-          await moveLeadToStatus(leadId, config.kommo.no_respondio_status_id, config);
+        if (config.kommo.ayuda_manual_status_id) {
+          await moveLeadToStatus(leadId, config.kommo.ayuda_manual_status_id, config);
         }
 
         return NextResponse.json({
           success: true,
-          message: 'Max attempts reached - moved to NO_RESPONDIO',
+          message: 'Max attempts reached - moved to AYUDA_MANUAL',
           data: {
             leadId,
             isValid: false,
