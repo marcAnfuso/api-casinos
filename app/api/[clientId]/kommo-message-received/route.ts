@@ -20,6 +20,26 @@ interface LastMessage {
 }
 
 /**
+ * Fetch con retry para llamadas a KOMMO API
+ */
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      return response;
+    } catch (error) {
+      if (attempt < retries) {
+        console.log(`[KOMMO] Fetch failed (attempt ${attempt + 1}/${retries + 1}), retrying in 1s...`);
+        await new Promise(r => setTimeout(r, 1000));
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error('fetchWithRetry: unreachable');
+}
+
+/**
  * Obtiene el último mensaje del lead usando la API de eventos/notas
  */
 async function getLastLeadMessage(leadId: number, config: ClientConfig): Promise<LastMessage | null> {
@@ -104,7 +124,7 @@ async function getLeadData(leadId: number, config: ClientConfig): Promise<LeadDa
   }
 
   try {
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
       {
         headers: {
@@ -171,7 +191,7 @@ async function updateLeadStatus(
       ];
     }
 
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
       {
         method: 'PATCH',
@@ -259,7 +279,7 @@ async function addNoteToLead(
   const noteText = `Comprobante recibido: ${fileName}${fileUrl ? `\nURL: ${fileUrl}` : ''}`;
 
   try {
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/notes`,
       {
         method: 'POST',
@@ -476,7 +496,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       console.log(`[${clientId}] Multi-pipeline client - fetching lead to detect pipeline...`);
 
       // Fetch lead to get pipeline_id using the base config
-      const leadResponse = await fetch(
+      const leadResponse = await fetchWithRetry(
         `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
         {
           headers: {
