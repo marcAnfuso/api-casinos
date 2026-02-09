@@ -322,12 +322,19 @@ async function handleNoProof(
 
   // Decide which stage to move to
   let statusId: number | undefined;
-  let stage: string;
+  let stage = 'unknown';
 
-  if (newIntentos >= maxIntentos && config.kommo.no_respondio_status_id) {
-    statusId = config.kommo.no_respondio_status_id;
-    stage = 'NO RESPONDIO';
-    console.log(`[${clientId}] Max intentos reached - moving to NO RESPONDIO`);
+  if (newIntentos >= maxIntentos) {
+    // Prefer AYUDA_MANUAL (like zeus), fall back to NO_RESPONDIO
+    if (config.kommo.ayuda_manual_status_id) {
+      statusId = config.kommo.ayuda_manual_status_id;
+      stage = 'AYUDA_MANUAL';
+      console.log(`[${clientId}] Max intentos reached - moving to AYUDA_MANUAL`);
+    } else if (config.kommo.no_respondio_status_id) {
+      statusId = config.kommo.no_respondio_status_id;
+      stage = 'NO RESPONDIO';
+      console.log(`[${clientId}] Max intentos reached - moving to NO RESPONDIO`);
+    }
   } else {
     statusId = config.kommo.comprobante_no_recibido_status_id;
     stage = 'COMPROBANTE NO RECIBIDO';
@@ -359,7 +366,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Flag to track if we need to resolve pipeline for multi-pipeline clients like Zeus
-  const isMultiPipelineClient = clientId === 'zeus';
+  const isMultiPipelineClient = clientId === 'zeus' || clientId === 'bet30';
 
   try {
     const contentType = request.headers.get('content-type');

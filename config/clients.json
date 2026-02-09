@@ -62,6 +62,96 @@
         "test_event_code": ""
       }
     },
+    "bet30_1": {
+      "name": "bet30 ENTRADA 1 (4241)",
+      "kommo": {
+        "access_token": "env:BET30_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lorenzogu32",
+        "pipeline_id": 13076191,
+        "esperando_comprobante_status_id": 101037955,
+        "comprobante_recibido_status_id": 101037987,
+        "comprobante_no_recibido_status_id": 101037983,
+        "ayuda_manual_status_id": 100829719,
+        "no_respondio_status_id": 100829723,
+        "intentos_comprobante_field_id": 1494398,
+        "max_intentos_comprobante": 3,
+        "transferido_status_ids": [],
+        "fbclid_field_id": 0,
+        "monto_field_id": 0
+      }
+    },
+    "bet30_2": {
+      "name": "bet30 ENTRADA 2 (8455)",
+      "kommo": {
+        "access_token": "env:BET30_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lorenzogu32",
+        "pipeline_id": 13076199,
+        "esperando_comprobante_status_id": 101037879,
+        "comprobante_recibido_status_id": 101037887,
+        "comprobante_no_recibido_status_id": 101037883,
+        "ayuda_manual_status_id": 100832083,
+        "no_respondio_status_id": 100832087,
+        "intentos_comprobante_field_id": 1494398,
+        "max_intentos_comprobante": 3,
+        "transferido_status_ids": [],
+        "fbclid_field_id": 0,
+        "monto_field_id": 0
+      }
+    },
+    "bet30_3": {
+      "name": "bet30 ENTRADA 3 (3615)",
+      "kommo": {
+        "access_token": "env:BET30_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lorenzogu32",
+        "pipeline_id": 13076203,
+        "esperando_comprobante_status_id": 101045039,
+        "comprobante_recibido_status_id": 101045047,
+        "comprobante_no_recibido_status_id": 101045043,
+        "ayuda_manual_status_id": 100832103,
+        "no_respondio_status_id": 100832107,
+        "intentos_comprobante_field_id": 1494398,
+        "max_intentos_comprobante": 3,
+        "transferido_status_ids": [],
+        "fbclid_field_id": 0,
+        "monto_field_id": 0
+      }
+    },
+    "bet30_4": {
+      "name": "bet30 ENTRADA 4 (9643)",
+      "kommo": {
+        "access_token": "env:BET30_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lorenzogu32",
+        "pipeline_id": 13076207,
+        "esperando_comprobante_status_id": 101045091,
+        "comprobante_recibido_status_id": 101045099,
+        "comprobante_no_recibido_status_id": 101045095,
+        "ayuda_manual_status_id": 100832123,
+        "no_respondio_status_id": 100832127,
+        "intentos_comprobante_field_id": 1494398,
+        "max_intentos_comprobante": 3,
+        "transferido_status_ids": [],
+        "fbclid_field_id": 0,
+        "monto_field_id": 0
+      }
+    },
+    "bet30_5": {
+      "name": "bet30 ENTRADA 5 (9414)",
+      "kommo": {
+        "access_token": "env:BET30_KOMMO_ACCESS_TOKEN",
+        "subdomain": "lorenzogu32",
+        "pipeline_id": 13076211,
+        "esperando_comprobante_status_id": 101045163,
+        "comprobante_recibido_status_id": 101045171,
+        "comprobante_no_recibido_status_id": 101045167,
+        "ayuda_manual_status_id": 100832179,
+        "no_respondio_status_id": 100832183,
+        "intentos_comprobante_field_id": 1494398,
+        "max_intentos_comprobante": 3,
+        "transferido_status_ids": [],
+        "fbclid_field_id": 0,
+        "monto_field_id": 0
+      }
+    },
     "zeus": {
       "name": "Casino Zeus (Base)",
       "kommo": {
