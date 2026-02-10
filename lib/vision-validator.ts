@@ -136,14 +136,20 @@ Para el campo "monto":
 - Si hay varios montos, usa el monto principal de la transacción (no comisiones ni saldos)
 - Si no podés determinar el monto, devolvé null
 
-Criterios para considerar como comprobante de pago:
-- Screenshot de transferencia bancaria
-- Comprobante de Mercado Pago, PayPal, o apps de pago
-- Recibo de cajero automático
-- Comprobante de depósito
-- Screenshot de wallet crypto mostrando transacción
+Criterios para considerar como comprobante de pago (debe mostrar una TRANSACCIÓN REALIZADA con datos específicos):
+- Screenshot de transferencia bancaria COMPLETADA (debe decir "Transferiste", "Enviaste", "Operación realizada", "Comprobante", etc.)
+- Comprobante de Mercado Pago, PayPal, o apps de pago que muestre una operación CONCRETADA
+- Recibo de cajero automático con detalle de operación
+- Comprobante de depósito con número de operación
+- Screenshot de wallet crypto mostrando una transacción ENVIADA
+- Debe tener al menos: monto + estado de la operación (exitosa/completada) o número de referencia/comprobante
 
-NO es comprobante de pago:
+NO es comprobante de pago (MUY IMPORTANTE - rechazar estos casos):
+- Pantalla principal/home de apps bancarias mostrando saldo disponible
+- Pantallas que solo muestran saldo o balance sin detalle de transferencia
+- Listados de movimientos o historial sin una transacción específica abierta
+- Pantallas con botones como "Transferir", "Pagar", "Ingresar" (es la home, NO un comprobante)
+- Screenshots que muestran opciones del banco pero no una operación realizada
 - Fotos personales, selfies, memes
 - Screenshots de conversaciones
 - Imágenes de productos
