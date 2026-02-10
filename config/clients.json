@@ -34,7 +34,7 @@
         "transferido_status_ids": [],
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3,
-        "fbclid_field_id": 0,
+        "fbclid_field_id": 1502086,
         "monto_field_id": 1501998
       },
       "backend": {
@@ -76,7 +76,7 @@
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3,
         "transferido_status_ids": [],
-        "fbclid_field_id": 0,
+        "fbclid_field_id": 1502086,
         "monto_field_id": 1501998
       }
     },
@@ -94,7 +94,7 @@
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3,
         "transferido_status_ids": [],
-        "fbclid_field_id": 0,
+        "fbclid_field_id": 1502086,
         "monto_field_id": 1501998
       }
     },
@@ -112,7 +112,7 @@
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3,
         "transferido_status_ids": [],
-        "fbclid_field_id": 0,
+        "fbclid_field_id": 1502086,
         "monto_field_id": 1501998
       }
     },
@@ -130,7 +130,7 @@
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3,
         "transferido_status_ids": [],
-        "fbclid_field_id": 0,
+        "fbclid_field_id": 1502086,
         "monto_field_id": 1501998
       }
     },
@@ -148,7 +148,7 @@
         "intentos_comprobante_field_id": 1494398,
         "max_intentos_comprobante": 3,
         "transferido_status_ids": [],
-        "fbclid_field_id": 0,
+        "fbclid_field_id": 1502086,
         "monto_field_id": 1501998
       }
     },
