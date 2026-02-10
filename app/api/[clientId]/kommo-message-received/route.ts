@@ -305,6 +305,52 @@ async function addNoteToLead(
 }
 
 /**
+ * Guarda el monto extraído por la IA en un custom field del lead
+ */
+async function saveMontoToLead(
+  leadId: number,
+  monto: number,
+  config: ClientConfig
+): Promise<boolean> {
+  if (!config.kommo.access_token || !config.kommo.subdomain || !config.kommo.monto_field_id) {
+    return false;
+  }
+
+  try {
+    const response = await fetchWithRetry(
+      `https://${config.kommo.subdomain}.kommo.com/api/v4/leads/${leadId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.kommo.access_token}`,
+        },
+        body: JSON.stringify({
+          custom_fields_values: [
+            {
+              field_id: config.kommo.monto_field_id,
+              values: [{ value: String(monto) }],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[KOMMO] Error saving monto:', { status: response.status, body: errorText });
+      return false;
+    }
+
+    console.log(`[KOMMO] Saved monto $${monto} to lead ${leadId}`);
+    return true;
+  } catch (error) {
+    console.error('[KOMMO] Error saving monto:', error);
+    return false;
+  }
+}
+
+/**
  * Procesa el caso de comprobante no recibido (incrementa intentos, decide etapa)
  */
 async function handleNoProof(
@@ -593,20 +639,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ success: true, message: 'Attachment type not valid for proof' });
     }
 
-    // Validate with AI Vision (only for images)
+    // Validate with AI Vision (images and PDFs)
+    const isPdf = fileName.toLowerCase().endsWith('.pdf');
     let aiValidation: ValidationResult = { isPaymentProof: true, confidence: 'low', reason: 'Skipped' };
-    if (attachmentType === 'image' && fileUrl) {
+    if ((attachmentType === 'image' || isPdf) && fileUrl) {
       aiValidation = await validatePaymentProof(fileUrl, fileName);
 
-      console.log(`[${clientId}] AI Validation:`, aiValidation);
+      console.log(`[${clientId}] AI Validation (${isPdf ? 'PDF' : 'image'}):`, aiValidation);
 
       // Not a payment proof → handle no proof
       if (!aiValidation.isPaymentProof) {
-        console.log(`[${clientId}] Image rejected: ${aiValidation.reason}`);
+        console.log(`[${clientId}] ${isPdf ? 'PDF' : 'Image'} rejected: ${aiValidation.reason}`);
         const result = await handleNoProof(leadId, config, clientId);
         return NextResponse.json({
           success: true,
-          message: `Image not a payment proof - moved to ${result.stage}`,
+          message: `${isPdf ? 'PDF' : 'Image'} not a payment proof - moved to ${result.stage}`,
           client: clientId,
           data: { leadId, ...result, aiValidation },
         });
@@ -630,11 +677,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       await addNoteToLead(leadId, fileName, fileUrl, config);
     }
 
+    // Save monto to KOMMO if AI extracted it and field is configured
+    let montoSaved = false;
+    if (aiValidation.monto && config.kommo.monto_field_id) {
+      console.log(`[${clientId}] AI detected monto: ${aiValidation.monto} - saving to field ${config.kommo.monto_field_id}`);
+      montoSaved = await saveMontoToLead(leadId, aiValidation.monto, config);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Proof received - moved to COMPROBANTE RECIBIDO',
       client: clientId,
-      data: { leadId, statusChanged, stage: 'COMPROBANTE RECIBIDO', aiValidation, fileName },
+      data: { leadId, statusChanged, stage: 'COMPROBANTE RECIBIDO', aiValidation, fileName, montoSaved },
     });
 
   } catch (error) {

@@ -1,6 +1,6 @@
 /**
  * AI Vision Validator using OpenAI GPT-4o-mini
- * Validates if an image is a payment receipt/proof
+ * Validates if an image or PDF is a payment receipt/proof
  */
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -11,6 +11,15 @@ export interface ValidationResult {
   isPaymentProof: boolean;
   confidence: 'high' | 'medium' | 'low';
   reason: string;
+  monto?: number;
+}
+
+/**
+ * Checks if a file is a PDF based on name or MIME type
+ */
+function isPdfFile(fileName: string, mimeType?: string): boolean {
+  return fileName.toLowerCase().endsWith('.pdf') ||
+    (mimeType?.includes('application/pdf') ?? false);
 }
 
 /**
@@ -39,7 +48,42 @@ async function imageUrlToBase64(imageUrl: string): Promise<{ base64: string; mim
 }
 
 /**
- * Validates if an image is a payment proof using OpenAI Vision
+ * Downloads a PDF and converts its first page to a PNG base64 image
+ */
+async function pdfUrlToBase64Image(pdfUrl: string): Promise<{ base64: string; mimeType: string } | null> {
+  try {
+    const response = await fetch(pdfUrl);
+    if (!response.ok) {
+      console.error('[Vision] Failed to download PDF:', response.status);
+      return null;
+    }
+
+    const pdfBuffer = Buffer.from(await response.arrayBuffer());
+    console.log(`[Vision] PDF downloaded: ${pdfBuffer.length} bytes`);
+
+    // Dynamic import to avoid Turbopack bundling issues
+    const { pdf } = await import('pdf-to-img');
+
+    // Convert first page to PNG
+    const pages = await pdf(pdfBuffer);
+    for await (const page of pages) {
+      // Return only the first page
+      return {
+        base64: Buffer.from(page).toString('base64'),
+        mimeType: 'image/png',
+      };
+    }
+
+    console.error('[Vision] PDF conversion returned no pages');
+    return null;
+  } catch (error) {
+    console.error('[Vision] Error converting PDF to image:', error);
+    return null;
+  }
+}
+
+/**
+ * Validates if an image or PDF is a payment proof using OpenAI Vision
  */
 export async function validatePaymentProof(
   imageUrl: string,
@@ -57,13 +101,22 @@ export async function validatePaymentProof(
     };
   }
 
-  // Download and convert image
-  const imageData = await imageUrlToBase64(imageUrl);
+  // Download and convert to base64 (handle both images and PDFs)
+  const isPdf = isPdfFile(fileName);
+  let imageData: { base64: string; mimeType: string } | null;
+
+  if (isPdf) {
+    console.log(`[Vision] PDF detected (${fileName}), converting first page to image...`);
+    imageData = await pdfUrlToBase64Image(imageUrl);
+  } else {
+    imageData = await imageUrlToBase64(imageUrl);
+  }
+
   if (!imageData) {
     return {
       isPaymentProof: false,
       confidence: 'low',
-      reason: 'Failed to download image',
+      reason: isPdf ? 'Failed to convert PDF to image' : 'Failed to download image',
     };
   }
 
@@ -73,8 +126,15 @@ Responde SOLO en este formato JSON exacto:
 {
   "isPaymentProof": true/false,
   "confidence": "high"/"medium"/"low",
-  "reason": "explicación breve en español"
+  "reason": "explicación breve en español",
+  "monto": número o null
 }
+
+Para el campo "monto":
+- Si es un comprobante de pago, extrae el monto/importe principal de la transacción (solo el número, sin símbolo de moneda)
+- Busca campos como "Importe", "Monto", "Total", "Transferiste", "Le pagaste", etc.
+- Si hay varios montos, usa el monto principal de la transacción (no comisiones ni saldos)
+- Si no podés determinar el monto, devolvé null
 
 Criterios para considerar como comprobante de pago:
 - Screenshot de transferencia bancaria
@@ -92,7 +152,7 @@ NO es comprobante de pago:
   // Retry loop
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[Vision] Attempt ${attempt}/${MAX_RETRIES} - Analyzing image: ${fileName}`);
+      console.log(`[Vision] Attempt ${attempt}/${MAX_RETRIES} - Analyzing ${isPdf ? 'PDF' : 'image'}: ${fileName}`);
 
       const response = await fetch(OPENAI_API_URL, {
         method: 'POST',
