@@ -48,9 +48,9 @@ async function imageUrlToBase64(imageUrl: string): Promise<{ base64: string; mim
 }
 
 /**
- * Downloads a PDF and converts its first page to a PNG base64 image
+ * Downloads a PDF and extracts its text content
  */
-async function pdfUrlToBase64Image(pdfUrl: string): Promise<{ base64: string; mimeType: string } | null> {
+async function pdfUrlToText(pdfUrl: string): Promise<string | null> {
   try {
     const response = await fetch(pdfUrl);
     if (!response.ok) {
@@ -62,24 +62,110 @@ async function pdfUrlToBase64Image(pdfUrl: string): Promise<{ base64: string; mi
     console.log(`[Vision] PDF downloaded: ${pdfBuffer.length} bytes`);
 
     // Dynamic import to avoid Turbopack bundling issues
-    const { pdf } = await import('pdf-to-img');
+    const { default: pdfParse } = await import('pdf-parse' as string);
+    const data = await pdfParse(pdfBuffer);
 
-    // Convert first page to PNG
-    const pages = await pdf(pdfBuffer);
-    for await (const page of pages) {
-      // Return only the first page
-      return {
-        base64: Buffer.from(page).toString('base64'),
-        mimeType: 'image/png',
-      };
-    }
-
-    console.error('[Vision] PDF conversion returned no pages');
-    return null;
+    console.log(`[Vision] PDF text extracted: ${data.text.length} chars`);
+    return data.text || null;
   } catch (error) {
-    console.error('[Vision] Error converting PDF to image:', error);
+    console.error('[Vision] Error extracting PDF text:', error);
     return null;
   }
+}
+
+/**
+ * Validates PDF text content using OpenAI chat (non-vision) API
+ */
+async function validatePdfText(pdfText: string, apiKey: string): Promise<ValidationResult> {
+  const prompt = `Analiza el siguiente texto extraído de un PDF y determina si es un comprobante de pago, transferencia bancaria, o recibo de transacción financiera.
+
+TEXTO DEL PDF:
+${pdfText.substring(0, 3000)}
+
+Responde SOLO en este formato JSON exacto:
+{
+  "isPaymentProof": true/false,
+  "confidence": "high"/"medium"/"low",
+  "reason": "explicación breve en español",
+  "monto": número o null
+}
+
+Para el campo "monto":
+- Si es un comprobante de pago, extrae el monto/importe principal de la transacción (solo el número, sin símbolo de moneda)
+- Busca campos como "Importe", "Monto", "Total", "Transferiste", "Le pagaste", etc.
+- Si hay varios montos, usa el monto principal de la transacción (no comisiones ni saldos)
+- Si no podés determinar el monto, devolvé null
+
+Criterios para considerar como comprobante de pago:
+- Debe mostrar una TRANSACCIÓN REALIZADA/COMPLETADA
+- Debe tener al menos: monto + estado de operación exitosa o número de referencia/comprobante
+- Recibos de AstroPay, Mercado Pago, bancos, wallets crypto, etc.
+
+NO es comprobante de pago:
+- Resúmenes de cuenta o estados de cuenta generales
+- Listados de movimientos sin una transacción específica
+- Documentos que no sean financieros`;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[Vision] PDF text analysis attempt ${attempt}/${MAX_RETRIES}`);
+
+      const response = await fetch(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 256,
+          temperature: 0.1,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Vision] OpenAI API error (attempt ${attempt}):`, response.status, errorText);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+        return { isPaymentProof: true, confidence: 'low', reason: 'API error after all retries' };
+      }
+
+      const data = await response.json();
+      const textResponse = data.choices?.[0]?.message?.content;
+
+      if (!textResponse) {
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+        return { isPaymentProof: true, confidence: 'low', reason: 'Empty API response after all retries' };
+      }
+
+      const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error('[Vision] Could not parse JSON from response:', textResponse);
+        return { isPaymentProof: true, confidence: 'low', reason: 'Could not parse response' };
+      }
+
+      const result = JSON.parse(jsonMatch[0]) as ValidationResult;
+      console.log('[Vision] PDF validation result:', result);
+      return result;
+
+    } catch (error) {
+      console.error(`[Vision] PDF validation error (attempt ${attempt}):`, error);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+        continue;
+      }
+      return { isPaymentProof: true, confidence: 'low', reason: 'Validation error after all retries' };
+    }
+  }
+
+  return { isPaymentProof: true, confidence: 'low', reason: 'Unknown error' };
 }
 
 /**
@@ -101,22 +187,32 @@ export async function validatePaymentProof(
     };
   }
 
-  // Download and convert to base64 (handle both images and PDFs)
+  // Handle PDFs via text extraction, images via vision API
   const isPdf = isPdfFile(fileName);
-  let imageData: { base64: string; mimeType: string } | null;
 
   if (isPdf) {
-    console.log(`[Vision] PDF detected (${fileName}), converting first page to image...`);
-    imageData = await pdfUrlToBase64Image(imageUrl);
-  } else {
-    imageData = await imageUrlToBase64(imageUrl);
+    console.log(`[Vision] PDF detected (${fileName}), extracting text...`);
+    const pdfText = await pdfUrlToText(imageUrl);
+
+    if (!pdfText || pdfText.trim().length < 10) {
+      return {
+        isPaymentProof: false,
+        confidence: 'low',
+        reason: 'No se pudo extraer texto del PDF',
+      };
+    }
+
+    return validatePdfText(pdfText, apiKey);
   }
+
+  // For images: download and convert to base64
+  const imageData = await imageUrlToBase64(imageUrl);
 
   if (!imageData) {
     return {
       isPaymentProof: false,
       confidence: 'low',
-      reason: isPdf ? 'Failed to convert PDF to image' : 'Failed to download image',
+      reason: 'Failed to download image',
     };
   }
 
